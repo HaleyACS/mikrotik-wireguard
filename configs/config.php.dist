@@ -52,6 +52,16 @@ return [
     'dnat_base' => 30000,
     'dnat_multiplier' => 1000,
 
+    // Show DNAT  Port column in peers table
+    // When true, a "Porta DNAT" column appears next to the IP column,
+    // displaying the DNAT port for each peer with a one-click copy.
+    'show_dnat_column' => false,
+
+    // Show Traffic column in peers table
+    // When true, a "Traffico" column appears showing RX/TX data for each peer.
+    // Default: true
+    'show_traffic_column' => true,
+
     // Default Export Format
     // Which tab to activate and auto-copy after peer creation or key regeneration.
     // 'conf' = WireGuard .conf format, 'rsc' = RouterOS .rsc script format.

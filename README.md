@@ -64,6 +64,9 @@ See `configs/config.php.dist` for a template with all available options:
 | `refresh_interval` | Dashboard auto-refresh interval in seconds (default: `30`) |
 | `handshake_timeout` | Minutes before a peer is shown as offline (default: `5`) |
 | `page_size` | Peers per page (default: `50`). Set to `0` to disable pagination |
+
+| `show_dnat_column` | Show DNAT Port column in peers table (default: `false`) |
+| `show_traffic_column` | Show Traffic column with RX/TX data (default: `true`) |
 | `dnat_base` | Base port for the DNAT formula (default: `30000`) |
 | `dnat_multiplier` | Third octet multiplier in the DNAT formula (default: `1000`) |
 | `export_mode` | Default export format after creation or key regeneration (`conf` or `rsc`). Default: `rsc` |

@@ -546,20 +546,9 @@ tr:hover td {
 .traffic-info {
     display: flex;
     align-items: center;
-    gap: .6rem;
+    gap: .75rem;
     font-size: .78rem;
     white-space: nowrap;
-}
-
-.traffic-row {
-    display: inline-flex;
-    align-items: center;
-    gap: .2rem;
-}
-
-.traffic-label {
-    color: var(--text-muted);
-    font-weight: 500;
 }
 
 .traffic-val {

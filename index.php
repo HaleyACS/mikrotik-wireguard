@@ -185,11 +185,16 @@ try {
                         <th id="th-ip" class="th-sortable" onclick="sortPeers('ip')" onkeydown="if(event.key==='Enter'||event.key===' ')sortPeers('ip')" tabindex="0" role="button">
                             <?php echo t($lang, 'table.ip'); ?> <span id="sort-ip-icon" class="sort-icon">↕</span>
                         </th>
+                        <?php if (!empty($config['show_dnat_column'])): ?>
+                        <th id="th-dnat-port"><?php echo t($lang, 'table.dnat_port'); ?></th>
+                        <?php endif; ?>
                         <th id="th-handshake" class="th-sortable" onclick="sortPeers('handshake')" onkeydown="if(event.key==='Enter'||event.key===' ')sortPeers('handshake')" tabindex="0" role="button">
                             <?php echo t($lang, 'table.handshake'); ?> <span id="sort-handshake-icon" class="sort-icon">↕</span>
                         </th>
                         <th><?php echo t($lang, 'table.endpoint'); ?></th>
+                        <?php if ($config['show_traffic_column'] ?? true): ?>
                         <th><?php echo t($lang, 'table.traffic'); ?></th>
+                        <?php endif; ?>
                         <th style="text-align: right;"><?php echo t($lang, 'table.actions'); ?></th>
                     </tr>
                 </thead>
@@ -486,6 +491,8 @@ try {
             translations: <?php echo json_encode(jsTranslations($lang), JSON_UNESCAPED_UNICODE); ?>,
             csrfToken: <?php echo json_encode(getCsrfToken()); ?>,
             exportMode: <?php echo json_encode($config['export_mode'] ?? 'rsc'); ?>,
+            showDnatColumn: <?php echo json_encode($config['show_dnat_column'] ?? false); ?>,
+            showTrafficColumn: <?php echo json_encode($config['show_traffic_column'] ?? true); ?>,
         };
     </script>
     <script src="assets/js/app.js"></script>

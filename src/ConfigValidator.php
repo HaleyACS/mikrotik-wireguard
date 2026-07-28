@@ -20,6 +20,8 @@ class ConfigValidator {
         self::validateEndpoint($config['endpoint']);
         self::validateClientAllowedIps($config['client_allowed_ips']);
         self::validateDnatFormula($config);
+        self::validateShowDnatColumn($config);
+        self::validateShowTrafficColumn($config);
         self::validateExportMode($config);
     }
 
@@ -173,6 +175,18 @@ class ConfigValidator {
         $mode = $config['export_mode'] ?? 'rsc';
         if (!in_array($mode, ['conf', 'rsc'], true)) {
             throw new InvalidArgumentException("export_mode must be 'conf' or 'rsc', got '$mode'");
+        }
+    }
+
+    private static function validateShowDnatColumn(array $config): void {
+        if (isset($config['show_dnat_column']) && !is_bool($config['show_dnat_column'])) {
+            throw new InvalidArgumentException("show_dnat_column must be a boolean (true or false)");
+        }
+    }
+
+    private static function validateShowTrafficColumn(array $config): void {
+        if (isset($config['show_traffic_column']) && !is_bool($config['show_traffic_column'])) {
+            throw new InvalidArgumentException("show_traffic_column must be a boolean (true or false)");
         }
     }
 

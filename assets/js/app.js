@@ -290,8 +290,11 @@ function renderPeers(peers) {
                 ${peer.disabled ? `<span class="badge-disabled">${t('js.disabled_badge')}</span>` : ''}
             </td>
             <td data-label="${t('js.col_ip')}">
-                <span class="peer-ip-badge" style="cursor:pointer;" onclick="copyDnatPort('${escapeJs(peer['allowed-address'].split('/')[0])}')" title="${t('js.copy_port_title')}">${escapeHtml(peer['allowed-address'].split('/')[0])}</span>
+                <span class="peer-ip-badge" style="cursor:pointer;" onclick="copyIp('${escapeJs(peer['allowed-address'].split('/')[0])}')" title="${t('js.copy_ip_title')}">${escapeHtml(peer['allowed-address'].split('/')[0])}</span>
             </td>
+            ${AppConfig.showDnatColumn ? `<td data-label="${t('js.col_dnat_port')}">
+                <span class="peer-ip-badge" style="cursor:pointer;" onclick="copyDnatPort('${escapeJs(peer['allowed-address'].split('/')[0])}')" title="${t('js.copy_port_title')}">${AppConfig.dnatBase + parseInt(peer['allowed-address'].split('/')[0].split('.')[2]) * AppConfig.dnatMultiplier + parseInt(peer['allowed-address'].split('/')[0].split('.')[3])}</span>
+            </td>` : ''}
             <td data-label="${t('js.col_handshake')}">
                 <div class="handshake-cell">
                     <span class="handshake-pulse ${isActive ? 'active' : ''}"></span>
@@ -304,18 +307,12 @@ function renderPeers(peers) {
                     ${escapeHtml(endpoint)}
                 </span>
             </td>
-            <td data-label="${t('js.col_traffic')}">
+            ${AppConfig.showTrafficColumn ? `<td data-label="${t('js.col_traffic')}">
                 <div class="traffic-info">
-                    <div class="traffic-row">
-                        <span class="traffic-label">${t('js.rx_label')}</span>
-                        <span class="traffic-val">${escapeHtml(peer.rx_formatted)}</span>
-                    </div>
-                    <div class="traffic-row">
-                        <span class="traffic-label">${t('js.tx_label')}</span>
-                        <span class="traffic-val">${escapeHtml(peer.tx_formatted)}</span>
-                    </div>
+                    <span class="traffic-val">↓ ${escapeHtml(peer.rx_formatted)}</span>
+                    <span class="traffic-val">↑ ${escapeHtml(peer.tx_formatted)}</span>
                 </div>
-            </td>
+            </td>` : ''}
             <td data-label="${t('js.col_actions')}" style="text-align:right;">
                 <div class="actions-cell">
                     <button class="icon-btn" onclick="openExportModal('${escapeJs(peer['.id'])}','${escapeJs(peer.name)}','${escapeJs(peer['allowed-address'])}')" title="${t('js.download_title')}">
@@ -836,6 +833,12 @@ function copyDnatPort(ip) {
     const dnatPort = AppConfig.dnatBase + parseInt(parts[2]) * AppConfig.dnatMultiplier + parseInt(parts[3]);
     navigator.clipboard.writeText(dnatPort.toString())
         .then(() => showToast(t('js.dnat_copied').replace('%d', dnatPort)))
+        .catch(() => showToast(t('js.copy_failed'), true));
+}
+
+function copyIp(ip) {
+    navigator.clipboard.writeText(ip)
+        .then(() => showToast(t('js.ip_copied')))
         .catch(() => showToast(t('js.copy_failed'), true));
 }
 
