@@ -75,6 +75,16 @@ class WireGuardManager {
     }
 
     /**
+     * Normalize a mixed boolean-like value from RouterOS to a PHP bool.
+     *
+     * RouterOS REST API returns 'true'/'false', native API returns 'yes'/'no',
+     * and PHP native API bridge may return native bools.
+     */
+    public static function normalizeBool($value): bool {
+        return $value === true || $value === 'true' || $value === 'yes';
+    }
+
+    /**
      * Format a numeric or pre-formatted bytes value into a human-readable format.
      * 
      * @param mixed $bytes
@@ -175,42 +185,75 @@ class WireGuardManager {
      */
     public function addPeer(string $name): array {
         $allPeers = $this->client->getAllPeers();
+
+        $interface = $this->config['interface'] ?? '';
+        foreach ($allPeers as $p) {
+            if (($p['interface'] ?? '') === $interface && strcasecmp(($p['name'] ?? ''), $name) === 0) {
+                throw new Exception("A peer with name '" . $name . "' already exists.");
+            }
+        }
+
         $clientIp = $this->calculateNextFreeIp($allPeers);
-
         $clientKeys = self::generateKeyPair();
-
         $serverPublicKey = $this->getServerPublicKey();
 
         $payload = [
-            'interface' => $this->config['interface'],
+            'interface' => $this->config['interface'] ?? '',
             'public-key' => $clientKeys['public_key'],
             'allowed-address' => $clientIp . '/32',
             'name' => $name,
         ];
 
         $result = $this->client->addPeer($payload);
-        $newPeerId = $result['.id'] ?? null;
+        $newPeerId = $result['.id'] ?? $this->resolvePeerId($clientKeys, $name);
 
-        // Fallback: if addPeer didn't return .id, look it up
-        if ($newPeerId === null) {
-            $updatedPeers = $this->getPeers();
-            foreach ($updatedPeers as $p) {
-                if (($p['public-key'] ?? '') === $clientKeys['public_key']) {
-                    $newPeerId = $p['.id'] ?? null;
-                    break;
-                }
-            }
-            if ($newPeerId === null) {
-                foreach ($updatedPeers as $p) {
-                    if (($p['name'] ?? '') === $name) {
-                        $newPeerId = $p['.id'] ?? null;
-                        break;
-                    }
-                }
+        $this->handleCollision($clientIp, $newPeerId);
+
+        $comment = $this->config['comment'] ?? ($this->config['interface'] ?? '');
+
+        return [
+            '.id' => $newPeerId,
+            'name' => $name,
+            'ip' => $clientIp,
+            'public_key' => $clientKeys['public_key'],
+            'private_key' => $clientKeys['private_key'],
+            'config' => self::generateConfig(
+                $clientIp,
+                $clientKeys['private_key'],
+                $serverPublicKey,
+                $this->config['endpoint'] ?? '',
+                $this->config['client_allowed_ips'] ?? ''
+            ),
+            'script' => self::generateRscScript(
+                $clientIp,
+                $clientKeys['private_key'],
+                $serverPublicKey,
+                $this->config['endpoint'] ?? '',
+                $this->config['client_allowed_ips'] ?? '',
+                'wg-resnovae',
+                $comment,
+                $this->config['server_ip'] ?? '3.0.0.1',
+                $this->config['subnet'] ?? '3.0.0.0/21'
+            ),
+        ];
+    }
+
+    private function resolvePeerId(array $clientKeys, string $name): ?string {
+        $updatedPeers = $this->getPeers();
+        foreach ($updatedPeers as $p) {
+            if (($p['public-key'] ?? '') === $clientKeys['public_key']) {
+                return $p['.id'] ?? null;
             }
         }
+        foreach ($updatedPeers as $p) {
+            if (($p['name'] ?? '') === $name) {
+                return $p['.id'] ?? null;
+            }
+        }
+        return null;
+    }
 
-        // Retry loop for IP collision (TOCTOU race: another request may have claimed the same IP)
+    private function handleCollision(string &$clientIp, ?string $newPeerId): void {
         $peerIp = $clientIp . '/32';
         $maxRetries = 3;
         for ($retry = 0; $retry < $maxRetries; $retry++) {
@@ -227,38 +270,6 @@ class WireGuardManager {
             $this->client->updatePeer($newPeerId, ['allowed-address' => $clientIp . '/32']);
             $peerIp = $clientIp . '/32';
         }
-
-        $clientConfig = self::generateConfig(
-            $clientIp,
-            $clientKeys['private_key'],
-            $serverPublicKey,
-            $this->config['endpoint'],
-            $this->config['client_allowed_ips']
-        );
-
-        $comment = $this->config['comment'] ?? $this->config['interface'];
-
-        $clientScript = self::generateRscScript(
-            $clientIp,
-            $clientKeys['private_key'],
-            $serverPublicKey,
-            $this->config['endpoint'],
-            $this->config['client_allowed_ips'],
-            'wg-resnovae',
-            $comment,
-            $this->config['server_ip'] ?? '3.0.0.1',
-            $this->config['subnet'] ?? '3.0.0.0/21'
-        );
-
-        return [
-            '.id' => $newPeerId,
-            'name' => $name,
-            'ip' => $clientIp,
-            'public_key' => $clientKeys['public_key'],
-            'private_key' => $clientKeys['private_key'],
-            'config' => $clientConfig,
-            'script' => $clientScript
-        ];
     }
 
     /**

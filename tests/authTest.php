@@ -1,50 +1,8 @@
 <?php
 
-require_once __DIR__ . '/run_tests.php';
-require_once __DIR__ . '/../src/auth.php';
+require_once __DIR__ . '/AuthTestCaseBase.php';
 
-class authTest extends TestCase {
-    private string $adminHashPath;
-    private ?string $originalHash = null;
-    private string $testHash;
-
-    private int $reportingLevel;
-
-    public function setUp(): void {
-        $this->reportingLevel = error_reporting(E_ALL & ~E_WARNING);
-        $this->adminHashPath = __DIR__ . '/../.admin-hash';
-        if (file_exists($this->adminHashPath)) {
-            $this->originalHash = file_get_contents($this->adminHashPath);
-        }
-        $this->testHash = password_hash('test_password_123', PASSWORD_BCRYPT);
-    }
-
-    public function tearDown(): void {
-        error_reporting($this->reportingLevel);
-        if ($this->originalHash !== null) {
-            file_put_contents($this->adminHashPath, $this->originalHash);
-        } else {
-            if (file_exists($this->adminHashPath)) {
-                unlink($this->adminHashPath);
-            }
-        }
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            session_destroy();
-        }
-    }
-
-    private function createHashFile(): void {
-        file_put_contents($this->adminHashPath, $this->testHash);
-        clearstatcache(true, $this->adminHashPath);
-    }
-
-    private function removeHashFile(): void {
-        if (file_exists($this->adminHashPath)) {
-            unlink($this->adminHashPath);
-        }
-        clearstatcache(true, $this->adminHashPath);
-    }
+class authTest extends AuthTestCase {
 
     public function testGetAdminHashNoFile(): void {
         $this->removeHashFile();

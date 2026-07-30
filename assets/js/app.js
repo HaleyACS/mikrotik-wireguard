@@ -6,7 +6,7 @@
 'use strict';
 
 /* ── Constants ───────────────────────────────────────────────── */
-const TOAST_DURATION = 3000;
+const TOAST_DURATION = 5000;
 const HIGHLIGHT_DURATION = 10000;
 const PAGE_SIZE = (AppConfig.pageSize > 0) ? AppConfig.pageSize : 0;
 
@@ -18,6 +18,16 @@ function t(key) {
 /* ── API URL helper ──────────────────────────────────────────── */
 function apiUrl(action) {
     return 'src/api.php?action=' + encodeURIComponent(action) + '&server=' + encodeURIComponent(AppConfig.serverKey);
+}
+
+/* ── API POST wrapper (fetch + CSRF + JSON) ────────────────── */
+async function apiPost(action, payload) {
+    const res = await fetch(apiUrl(action), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
+        body: JSON.stringify(payload)
+    });
+    return await res.json();
 }
 
 /* ── Server switch ───────────────────────────────────────────── */
@@ -471,24 +481,13 @@ async function submitAddPeer(event) {
     submitBtn.innerText = t('js.creating');
     submitBtn.disabled = true;
 
-    try {
-        const res = await fetch(apiUrl('add_peer'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
-            body: JSON.stringify({ name: nameInput.value })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showToast(t('js.peer_created'));
-            pendingHighlightId = data.peer.ip;
-            displayAddResult(data.peer);
-        } else {
-            showToast(t('js.create_error').replace('%s', data.error), true);
-            submitBtn.innerText = orig;
-            submitBtn.disabled = false;
-        }
-    } catch {
-        showToast(t('js.api_error'), true);
+    const data = await apiPost('add_peer', { name: nameInput.value });
+    if (data.success) {
+        showToast(t('js.peer_created'));
+        pendingHighlightId = data.peer.ip;
+        displayAddResult(data.peer);
+    } else {
+        showToast(t('js.create_error').replace('%s', data.error), true);
         submitBtn.innerText = orig;
         submitBtn.disabled = false;
     }
@@ -567,24 +566,15 @@ async function submitEditPeer(event) {
     event.preventDefault();
     const id = document.getElementById('editPeerId').value;
     const name = document.getElementById('editPeerName').value;
-    try {
-        const res = await fetch(apiUrl('update_peer'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
-            body: JSON.stringify({ id, name })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showToast(t('js.peer_updated'));
-            const editedPeer = allPeers.find(p => p['.id'] === id);
-            pendingHighlightId = editedPeer ? (editedPeer['allowed-address'] || '').split('/')[0] : null;
-            closeEditModal();
-            loadPeers();
-        } else {
-            showToast(t('js.update_error').replace('%s', data.error), true);
-        }
-    } catch {
-        showToast(t('js.api_error'), true);
+    const data = await apiPost('update_peer', { id, name });
+    if (data.success) {
+        showToast(t('js.peer_updated'));
+        const editedPeer = allPeers.find(p => p['.id'] === id);
+        pendingHighlightId = editedPeer ? (editedPeer['allowed-address'] || '').split('/')[0] : null;
+        closeEditModal();
+        loadPeers();
+    } else {
+        showToast(t('js.update_error').replace('%s', data.error), true);
     }
 }
 
@@ -640,22 +630,13 @@ function closeConfirmModal() {
 }
 
 async function submitDeletePeer(id) {
-    try {
-        const res = await fetch(apiUrl('delete_peer'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
-            body: JSON.stringify({ id })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showToast(t('js.peer_deleted'));
-            closeDeleteModal();
-            loadPeers();
-        } else {
-            showToast(t('js.delete_error').replace('%s', data.error), true);
-        }
-    } catch {
-        showToast(t('js.api_error'), true);
+    const data = await apiPost('delete_peer', { id });
+    if (data.success) {
+        showToast(t('js.peer_deleted'));
+        closeDeleteModal();
+        loadPeers();
+    } else {
+        showToast(t('js.delete_error').replace('%s', data.error), true);
     }
 }
 
@@ -665,21 +646,12 @@ async function togglePeer(id, currentlyDisabled) {
     const newDisabled = !currentlyDisabled;
 
     const doToggle = async () => {
-        try {
-            const res = await fetch(apiUrl('toggle_peer'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
-                body: JSON.stringify({ id, disabled: newDisabled })
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast(newDisabled ? t('js.peer_disabled') : t('js.peer_enabled'));
-                loadPeers();
-            } else {
-                showToast(t('js.toggle_error').replace('%s', data.error), true);
-            }
-        } catch {
-            showToast(t('js.api_error'), true);
+        const data = await apiPost('toggle_peer', { id, disabled: newDisabled });
+        if (data.success) {
+            showToast(newDisabled ? t('js.peer_disabled') : t('js.peer_enabled'));
+            loadPeers();
+        } else {
+            showToast(t('js.toggle_error').replace('%s', data.error), true);
         }
     };
 
@@ -721,42 +693,9 @@ async function openExportModal(id, name, allowedAddress) {
     trapFocus(backdrop);
 }
 
-function updateExportConfig(privateKey) {
-    const serverPubKey = AppConfig.serverPublicKey || 'SERVER_PUBLIC_KEY';
-    const endpointParts = AppConfig.endpoint.split(':');
-    const endpointHost = endpointParts[0] || '';
-    const endpointPort = endpointParts[1] || '13231';
-    const subnetParts = (AppConfig.subnet || '3.0.0.0/21').split('/');
-    const subnetNetwork = subnetParts[0];
-    const subnetMask = subnetParts[1] || '21';
-
-    const confContent = `[Interface]
-PrivateKey = ${privateKey}
-Address = ${exportPeerIp}/${subnetMask}
-
-[Peer]
-PublicKey = ${serverPubKey}
-Endpoint = ${AppConfig.endpoint}
-AllowedIPs = ${AppConfig.clientAllowedIps}
-PersistentKeepalive = 25`;
-
-    const scriptContent = `# --- MikroTik Client Setup Script ---
-# ${t('js.script_comment_header')}
-
-/interface wireguard
-add name="wg-resnovae" private-key="${privateKey}" mtu=1420
-
-/interface wireguard peers
-add interface="wg-resnovae" public-key="${serverPubKey}" \\
-    endpoint-address="${endpointHost}" endpoint-port=${endpointPort} \\
-    allowed-address="${AppConfig.clientAllowedIps}" persistent-keepalive=25s \\
-    comment="${AppConfig.comment || AppConfig.interface}"
-
-/ip address
-add address="${exportPeerIp}/${subnetMask}" network="${subnetNetwork}" interface="wg-resnovae"
-
-/ip firewall address-list
-add address=${AppConfig.serverIp} list=MANAGEMENT`;
+function updateExportConfig(data) {
+    const confContent = data.config || '';
+    const scriptContent = data.script || '';
 
     document.getElementById('code-export-conf-text').innerText = confContent;
     document.getElementById('code-export-script-text').innerText = scriptContent;
@@ -778,30 +717,18 @@ async function regenerateKey() {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> ${t('js.regenerating')}`;
 
-        try {
-            const res = await fetch(apiUrl('regenerate_key'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
-                body: JSON.stringify({ id: exportPeerId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                updateExportConfig(data.private_key);
+        const data = await apiPost('regenerate_key', { id: exportPeerId });
+        if (data.success) {
+            updateExportConfig(data);
 
-                // Show config section
-                document.getElementById('exportConfigSection').style.display = 'block';
+            document.getElementById('exportConfigSection').style.display = 'block';
 
-                showToast(t('js.key_regenerated'));
-                btn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                    ${t('js.config_updated')}`;
-            } else {
-                showToast(t('js.regenerate_error').replace('%s', data.error), true);
-                btn.disabled = false;
-                btn.innerHTML = `${t('js.regenerate_btn')}`;
-            }
-        } catch {
-            showToast(t('js.api_error'), true);
+            showToast(t('js.key_regenerated'));
+            btn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                ${t('js.config_updated')}`;
+        } else {
+            showToast(t('js.regenerate_error').replace('%s', data.error), true);
             btn.disabled = false;
             btn.innerHTML = `${t('js.regenerate_btn')}`;
         }
@@ -882,45 +809,34 @@ async function submitExportVpnIps() {
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> ${t('js.exporting')}`;
 
-    try {
-        const res = await fetch(apiUrl('export_vpn_ips'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': AppConfig.csrfToken },
-            body: JSON.stringify({
-                include_sstp: document.getElementById('includeSstpCheck').checked,
-                include_pptp: document.getElementById('includePptpCheck').checked
-            })
-        });
-        const data = await res.json();
-        if (data.success) {
-            document.getElementById('exportVpnIpsWgCount').innerText = data.stats.wireguard;
-            document.getElementById('exportVpnIpsSstpCount').innerText = data.stats.sstp;
-            document.getElementById('exportVpnIpsPptpCount').innerText = data.stats.pptp;
+    const data = await apiPost('export_vpn_ips', {
+        include_sstp: document.getElementById('includeSstpCheck').checked,
+        include_pptp: document.getElementById('includePptpCheck').checked
+    });
+    if (data.success) {
+        document.getElementById('exportVpnIpsWgCount').innerText = data.stats.wireguard;
+        document.getElementById('exportVpnIpsSstpCount').innerText = data.stats.sstp;
+        document.getElementById('exportVpnIpsPptpCount').innerText = data.stats.pptp;
 
-            if (data.secret_error) {
-                const errMsg = data.stats.sstp || data.stats.pptp ? t('js.export_warn_sstp') : data.secret_error;
-                document.getElementById('exportVpnIpsSstpCount').innerText = data.stats.sstp > 0 ? data.stats.sstp + ' (' + errMsg + ')' : data.stats.sstp;
-                document.getElementById('exportVpnIpsPptpCount').innerText = data.stats.pptp > 0 ? data.stats.pptp + ' (' + errMsg + ')' : data.stats.pptp;
-            }
-
-            document.getElementById('exportVpnIpsResult').style.display = 'block';
-            document.getElementById('exportVpnIpsFooter').style.display = 'none';
-
-            const url = URL.createObjectURL(new Blob([data.content], { type: 'text/plain;charset=utf-8' }));
-            const a = Object.assign(document.createElement('a'), { href: url, download: data.filename });
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showToast(t('js.file_downloaded').replace('%s', data.filename));
-        } else {
-            showToast(t('js.export_error').replace('%s', data.error), true);
-            btn.disabled = false;
-            btn.innerHTML = `${t('js.export_vpn_download')}`;
+        if (data.secret_error) {
+            const errMsg = data.stats.sstp || data.stats.pptp ? t('js.export_warn_sstp') : data.secret_error;
+            document.getElementById('exportVpnIpsSstpCount').innerText = data.stats.sstp > 0 ? data.stats.sstp + ' (' + errMsg + ')' : data.stats.sstp;
+            document.getElementById('exportVpnIpsPptpCount').innerText = data.stats.pptp > 0 ? data.stats.pptp + ' (' + errMsg + ')' : data.stats.pptp;
         }
-    } catch {
-        showToast(t('js.api_error'), true);
+
+        document.getElementById('exportVpnIpsResult').style.display = 'block';
+        document.getElementById('exportVpnIpsFooter').style.display = 'none';
+
+        const url = URL.createObjectURL(new Blob([data.content], { type: 'text/plain;charset=utf-8' }));
+        const a = Object.assign(document.createElement('a'), { href: url, download: data.filename });
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast(t('js.file_downloaded').replace('%s', data.filename));
+    } else {
+        showToast(t('js.export_error').replace('%s', data.error), true);
         btn.disabled = false;
         btn.innerHTML = `${t('js.export_vpn_download')}`;
     }

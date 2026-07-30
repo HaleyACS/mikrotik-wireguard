@@ -111,6 +111,8 @@ class MikrotikRestClient implements ClientInterface {
                     $errorMessage .= ': ' . $decoded['detail'];
                 } elseif (isset($decoded['message'])) {
                     $errorMessage .= ': ' . $decoded['message'];
+                } elseif (isset($decoded['error']) && is_string($decoded['error'])) {
+                    $errorMessage .= ': ' . $decoded['error'];
                 }
             } else {
                 $errorMessage .= ': ' . substr($response, 0, 200);
@@ -149,8 +151,7 @@ class MikrotikRestClient implements ClientInterface {
                     $out[$f] = $peer[$f];
                 }
             }
-            $raw = $peer['disabled'] ?? false;
-            $out['disabled'] = $raw === true || $raw === 'true' || $raw === 'yes';
+            $out['disabled'] = WireGuardManager::normalizeBool($peer['disabled'] ?? false);
             $out['rx_formatted'] = WireGuardManager::formatBytes($peer['rx'] ?? 0);
             $out['tx_formatted'] = WireGuardManager::formatBytes($peer['tx'] ?? 0);
             $out['handshake_formatted'] = WireGuardManager::formatHandshake($peer['last-handshake'] ?? '');
@@ -228,8 +229,8 @@ class MikrotikRestClient implements ClientInterface {
             if (($iface['name'] ?? '') === $this->getInterface()) {
                 return [
                     'name' => $iface['name'] ?? '',
-                    'running' => ($iface['running'] ?? 'false') === 'true',
-                    'disabled' => ($iface['disabled'] ?? 'false') === 'true',
+                    'running' => WireGuardManager::normalizeBool($iface['running'] ?? 'false'),
+                    'disabled' => WireGuardManager::normalizeBool($iface['disabled'] ?? 'false'),
                     'listen-port' => (int)($iface['listen-port'] ?? 0),
                     'mtu' => (int)($iface['mtu'] ?? 0),
                     'public-key' => $iface['public-key'] ?? '',

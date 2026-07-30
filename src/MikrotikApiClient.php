@@ -52,8 +52,8 @@ class MikrotikApiClient implements ClientInterface
             $iface = $result[$ifaceName];
             return [
                 'name' => $iface['name'] ?? $ifaceName,
-                'running' => (($raw = $iface['running'] ?? 'false') === true || $raw === 'true' || $raw === 'yes'),
-                'disabled' => (($raw = $iface['disabled'] ?? 'false') === true || $raw === 'true' || $raw === 'yes'),
+                'running' => WireGuardManager::normalizeBool($iface['running'] ?? 'false'),
+                'disabled' => WireGuardManager::normalizeBool($iface['disabled'] ?? 'false'),
                 'listen-port' => (int)($iface['listen-port'] ?? 0),
                 'mtu' => (int)($iface['mtu'] ?? 0),
                 'public-key' => $iface['public-key'] ?? '',
@@ -116,7 +116,7 @@ class MikrotikApiClient implements ClientInterface
                 'last-handshake' => $data['last-handshake'] ?? '',
                 'current-endpoint-address' => $data['current-endpoint-address'] ?? '',
                 'public-key' => $data['public-key'] ?? '',
-                'disabled' => (($raw = $data['disabled'] ?? 'no') === true || $raw === 'true' || $raw === 'yes'),
+                'disabled' => WireGuardManager::normalizeBool($data['disabled'] ?? 'no'),
                 'rx' => $data['rx'] ?? '0',
                 'tx' => $data['tx'] ?? '0',
             ];

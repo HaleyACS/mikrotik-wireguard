@@ -65,8 +65,17 @@ try {
         if (empty($name)) {
             throw new Exception(t($lang, 'api.name_required'));
         }
-        $result = $manager->addPeer($name);
-        echo json_encode(['success' => true, 'peer' => $result]);
+        try {
+            $result = $manager->addPeer($name);
+            echo json_encode(['success' => true, 'peer' => $result]);
+        } catch (Exception $e) {
+            if (str_contains($e->getMessage(), 'already exists')) {
+                echo json_encode(['success' => false, 'error' => sprintf(t($lang, 'api.duplicate_name'), $name)]);
+            } else {
+                throw $e;
+            }
+            exit;
+        }
         exit;
     }
 
@@ -77,10 +86,41 @@ try {
             throw new Exception(t($lang, 'api.id_required'));
         }
         $keys = $manager->regenerateKey($id);
+
+        $peers = $manager->getPeers();
+        $peerData = null;
+        foreach ($peers as $p) {
+            if ($p['.id'] === $id) {
+                $peerData = $p;
+                break;
+            }
+        }
+
+        $confContent = null;
+        $scriptContent = null;
+        if ($peerData) {
+            $peerIp = explode('/', $peerData['allowed-address'] ?? '')[0];
+            $serverPubKey = $manager->getServerPublicKey();
+            $confContent = WireGuardManager::generateConfig(
+                $peerIp, $keys['private_key'], $serverPubKey,
+                $config['endpoint'], $config['client_allowed_ips']
+            );
+            $scriptContent = WireGuardManager::generateRscScript(
+                $peerIp, $keys['private_key'], $serverPubKey,
+                $config['endpoint'], $config['client_allowed_ips'],
+                $config['interface'],
+                $config['comment'] ?? $config['interface'],
+                $config['server_ip'],
+                $config['subnet']
+            );
+        }
+
         echo json_encode([
             'success' => true,
             'public_key' => $keys['public_key'],
-            'private_key' => $keys['private_key']
+            'private_key' => $keys['private_key'],
+            'config' => $confContent,
+            'script' => $scriptContent,
         ]);
         exit;
     }
@@ -137,7 +177,7 @@ try {
                 $secrets = $client->getPppSecrets();
                 foreach ($secrets as $secret) {
                     $disabled = $secret['disabled'] ?? 'no';
-                    if (($secret['service'] ?? '') === $service && $disabled !== 'yes' && $disabled !== 'true') {
+                    if (($secret['service'] ?? '') === $service && !WireGuardManager::normalizeBool($disabled)) {
                         $addr = $secret['remote-address'] ?? $secret['address'] ?? '';
                         if (!empty($addr) && filter_var($addr, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
                             $ips[] = $addr;

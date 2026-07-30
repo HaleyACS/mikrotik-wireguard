@@ -1,37 +1,11 @@
 <?php
 
-require_once __DIR__ . '/run_tests.php';
-require_once __DIR__ . '/../src/auth.php';
+require_once __DIR__ . '/AuthTestCaseBase.php';
 
-class authEdgeCasesTest extends TestCase {
-    private string $adminHashPath;
-    private ?string $originalHash = null;
-    private int $reportingLevel;
-
+class authEdgeCasesTest extends AuthTestCase {
     public function setUp(): void {
-        $this->reportingLevel = error_reporting(E_ALL & ~E_WARNING);
-        $this->adminHashPath = __DIR__ . '/../.admin-hash';
-        if (file_exists($this->adminHashPath)) {
-            $this->originalHash = file_get_contents($this->adminHashPath);
-        }
-        // Clear session data but don't destroy — PHP 8.4 CLI rejects session_start() after echo
+        parent::setUp();
         $_SESSION = [];
-    }
-
-    public function tearDown(): void {
-        error_reporting($this->reportingLevel);
-        if ($this->originalHash !== null) {
-            file_put_contents($this->adminHashPath, $this->originalHash);
-        } else {
-            if (file_exists($this->adminHashPath)) {
-                unlink($this->adminHashPath);
-            }
-        }
-        clearstatcache(true, $this->adminHashPath);
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            session_destroy();
-        }
     }
 
     // ── requireAuth tests via subprocess ────────────────────────────
@@ -104,21 +78,6 @@ class authEdgeCasesTest extends TestCase {
         $this->assertNotNull($data);
         $this->assertFalse($data['success']);
         $this->assertEquals('Unauthorized', $data['error']);
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────
-
-    private function createHashFile(string $password = 'test_password'): void {
-        $hash = password_hash($password, PASSWORD_BCRYPT);
-        file_put_contents($this->adminHashPath, $hash);
-        clearstatcache(true, $this->adminHashPath);
-    }
-
-    private function removeHashFile(): void {
-        if (file_exists($this->adminHashPath)) {
-            unlink($this->adminHashPath);
-        }
-        clearstatcache(true, $this->adminHashPath);
     }
 
     private function runRequireAuthTest(string $scriptName, bool $loggedIn): string {

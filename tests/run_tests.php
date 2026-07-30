@@ -126,8 +126,8 @@ foreach ($testFiles as $file) {
     }
 
     foreach ($newClasses as $class) {
-        if (is_subclass_of($class, 'TestCase')) {
-            $reflection = new ReflectionClass($class);
+        $reflection = new ReflectionClass($class);
+        if (is_subclass_of($class, 'TestCase') && !$reflection->isAbstract()) {
             $methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
             
             echo "Class: \033[1m$class\033[0m\n";

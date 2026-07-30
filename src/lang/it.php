@@ -137,6 +137,7 @@ return [
     'api.id_required'        => 'ID obbligatorio.',
     'api.id_name_required'   => 'ID e nome sono obbligatori.',
     'api.unknown_action'     => 'Azione sconosciuta: %s',
+    'api.duplicate_name'     => 'Un peer con nome "%s" esiste già.',
 
     // ── JavaScript UI strings ──────────────────────────────────
     'js.col_name'             => 'Nome & Commento',

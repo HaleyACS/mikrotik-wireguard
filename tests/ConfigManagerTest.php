@@ -20,17 +20,17 @@ class ConfigManagerTest extends TestCase
     {
         $servers = ConfigManager::getAvailableServers();
         $this->assertNotEmpty($servers);
-        $this->assertTrue(isset($servers['resnovae']), 'resnovae config should be found');
-        $this->assertTrue(isset($servers['dinomusa']), 'dinomusa config should be found');
+        $this->assertTrue(isset($servers['01-resnovae']), '01-resnovae config should be found');
+        $this->assertTrue(isset($servers['02-dinomusa']), '02-dinomusa config should be found');
     }
 
     public function testGetAvailableServersHasMetadata(): void
     {
         $servers = ConfigManager::getAvailableServers();
-        $this->assertEquals('dinomusa', $servers['dinomusa']['key']);
-        $this->assertNotEmpty($servers['dinomusa']['name']);
-        $this->assertNotEmpty($servers['dinomusa']['host']);
-        $this->assertEquals('resnovae', $servers['resnovae']['key']);
+        $this->assertEquals('02-dinomusa', $servers['02-dinomusa']['key']);
+        $this->assertNotEmpty($servers['02-dinomusa']['name']);
+        $this->assertNotEmpty($servers['02-dinomusa']['host']);
+        $this->assertEquals('01-resnovae', $servers['01-resnovae']['key']);
     }
 
     public function testGetActiveServerKeyDefaultsToFirst(): void
@@ -43,9 +43,9 @@ class ConfigManagerTest extends TestCase
 
     public function testGetActiveServerKeyFromGetParam(): void
     {
-        $_GET['server'] = 'resnovae';
+        $_GET['server'] = '01-resnovae';
         $key = ConfigManager::getActiveServerKey();
-        $this->assertEquals('resnovae', $key);
+        $this->assertEquals('01-resnovae', $key);
     }
 
     public function testGetActiveServerKeyFromGetParamPrefersValid(): void
@@ -76,17 +76,17 @@ class ConfigManagerTest extends TestCase
 
     public function testResolveConfigWithGetParam(): void
     {
-        $_GET['server'] = 'dinomusa';
+        $_GET['server'] = '02-dinomusa';
         $config = ConfigManager::resolveConfig();
-        $this->assertEquals('dinomusa', $config['_server_key']);
+        $this->assertEquals('02-dinomusa', $config['_server_key']);
         $this->assertEquals('mailserver.dinomusa.it', $config['host']);
     }
 
     public function testResolveConfigWithResnovae(): void
     {
-        $_GET['server'] = 'resnovae';
+        $_GET['server'] = '01-resnovae';
         $config = ConfigManager::resolveConfig();
-        $this->assertEquals('resnovae', $config['_server_key']);
+        $this->assertEquals('01-resnovae', $config['_server_key']);
         $this->assertEquals('192.168.111.253', $config['host']);
         $this->assertEquals('rest', $config['api_mode']);
     }
@@ -102,7 +102,7 @@ class ConfigManagerTest extends TestCase
 
     public function testResnovaeConfigValid(): void
     {
-        $config = require __DIR__ . '/../configs/resnovae.php';
+        $config = require __DIR__ . '/../configs/01-resnovae.php';
         $this->assertEquals('rest', $config['api_mode']);
         $this->assertEquals('3.0.0.0/21', $config['subnet']);
         $this->assertEquals('192.168.111.253', $config['host']);
@@ -111,7 +111,7 @@ class ConfigManagerTest extends TestCase
 
     public function testDinomasaConfigValid(): void
     {
-        $config = require __DIR__ . '/../configs/dinomusa.php';
+        $config = require __DIR__ . '/../configs/02-dinomusa.php';
         $this->assertEquals('native', $config['api_mode']);
         $this->assertEquals('10.200.200.10/24', $config['subnet']);
         $this->assertEquals('mailserver.dinomusa.it', $config['host']);

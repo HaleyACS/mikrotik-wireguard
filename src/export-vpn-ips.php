@@ -20,7 +20,7 @@ try {
     foreach ($secrets as $secret) {
         $disabled = $secret['disabled'] ?? 'no';
         $service = $secret['service'] ?? '';
-        if ($service === 'sstp' && $disabled !== 'yes' && $disabled !== 'true') {
+        if ($service === 'sstp' && !WireGuardManager::normalizeBool($disabled)) {
             if (!empty($secret['remote-address'])) {
                 $ip = $secret['remote-address'];
                 if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
