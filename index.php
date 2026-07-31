@@ -45,7 +45,8 @@ $availableServers = ConfigManager::getAvailableServers();
 $currentServerKey = $config['_server_key'];
 $currentServerName = $availableServers[$currentServerKey]['name'] ?? $currentServerKey;
 
-header("Content-Security-Policy: default-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; img-src 'self' data:;");
+$cspNonce = base64_encode(random_bytes(16));
+header("Content-Security-Policy: default-src 'self'; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'nonce-{$cspNonce}'; img-src 'self' data:;");
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 
@@ -61,14 +62,7 @@ try {
 $connectionError = null;
 try {
     $client = ClientFactory::create($config);
-    $apiMode = $config['api_mode'] ?? 'rest';
-    if ($apiMode === 'native') {
-        // Test native API via Python bridge
-        $client->getPeers();
-    } else {
-        // Test REST API — use getPeers() which both modes implement
-        $client->getPeers();
-    }
+    $client->getPeers();
 } catch (Exception $e) {
     $connectionError = $e->getMessage();
 }
@@ -89,7 +83,7 @@ try {
 <body>
 
     <?php if ($connectionError !== null): ?>
-        <div class="banner banner-danger" id="errorBanner">
+        <div class="banner banner-danger" id="errorBanner" role="alert">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
             <span><?php printf(t($lang, 'banner.api_error'), '<strong>' . htmlspecialchars($connectionError) . '</strong>'); ?></span>
         </div>
@@ -113,7 +107,7 @@ try {
                         : t($lang, 'header.api_rest');
                     echo '<span class="api-mode-badge">' . t($lang, 'header.api_mode') . ' ' . $apiModeLabel . '</span>';
                 ?>
-                <select id="serverSelector" class="server-selector" onchange="switchServer(this.value)" aria-label="<?php echo t($lang, 'header.server_select'); ?>">
+                <select id="serverSelector" class="server-selector" aria-label="<?php echo t($lang, 'header.server_select'); ?>">
                     <?php foreach ($availableServers as $key => $srv): ?>
                         <option value="<?php echo htmlspecialchars($key); ?>" <?php echo $key === $currentServerKey ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($srv['name']); ?>
@@ -156,15 +150,15 @@ try {
                 <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.602 10.602Z" /></svg>
                 <input type="text" id="searchInput" placeholder="<?php echo t($lang, 'search.placeholder'); ?>" aria-label="<?php echo t($lang, 'search.placeholder'); ?>">
             </div>
-            <button class="btn btn-secondary btn-sm" id="hideOfflineBtn" onclick="toggleHideOffline()" title="<?php echo t($lang, 'search.hide_offline_title'); ?>">
+            <button class="btn btn-secondary btn-sm" id="hideOfflineBtn" title="<?php echo t($lang, 'search.hide_offline_title'); ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;margin-right:4px;vertical-align:middle;"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
-                <span id="hideOfflineLabel"><?php echo t($lang, 'search.hide_offline'); ?></span>
+                <span id="hideOfflineLabel"><?php echo t($lang, 'js.hide_offline'); ?></span>
             </button>
-            <button class="btn btn-primary" onclick="openAddModal()">
+            <button class="btn btn-primary" data-action="open-add">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                 <?php echo t($lang, 'search.add_peer'); ?>
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="openExportVpnIpsModal()" title="<?php echo htmlspecialchars(t($lang, 'modal.export_vpn.title')); ?>">
+            <button class="btn btn-secondary btn-sm" data-action="open-export-vpn" title="<?php echo htmlspecialchars(t($lang, 'modal.export_vpn.title')); ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:18px;height:18px;margin-right:4px;vertical-align:middle;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                 <span><?php echo t($lang, 'modal.export_vpn.title'); ?></span>
             </button>
@@ -179,23 +173,25 @@ try {
             <table id="peersTable" aria-label="<?php echo t($lang, 'table.aria_label'); ?>">
                 <thead>
                     <tr>
-                        <th id="th-name" class="th-sortable" onclick="sortPeers('name')" onkeydown="if(event.key==='Enter'||event.key===' ')sortPeers('name')" tabindex="0" role="button">
+                        <th id="th-name" class="th-sortable" data-action="sort" data-sort="name" tabindex="0" role="button">
                             <?php echo t($lang, 'table.name'); ?> <span id="sort-name-icon" class="sort-icon">↕</span>
                         </th>
-                        <th id="th-ip" class="th-sortable" onclick="sortPeers('ip')" onkeydown="if(event.key==='Enter'||event.key===' ')sortPeers('ip')" tabindex="0" role="button">
+                        <th id="th-ip" class="th-sortable" data-action="sort" data-sort="ip" tabindex="0" role="button">
                             <?php echo t($lang, 'table.ip'); ?> <span id="sort-ip-icon" class="sort-icon">↕</span>
                         </th>
                         <?php if (!empty($config['show_dnat_column'])): ?>
-                        <th id="th-dnat-port"><?php echo t($lang, 'table.dnat_port'); ?></th>
+                        <th id="th-dnat-port" class="th-sortable" data-action="sort" data-sort="dnat" tabindex="0" role="button">
+                            <?php echo t($lang, 'table.dnat_port'); ?> <span id="sort-dnat-icon" class="sort-icon">↕</span>
+                        </th>
                         <?php endif; ?>
-                        <th id="th-handshake" class="th-sortable" onclick="sortPeers('handshake')" onkeydown="if(event.key==='Enter'||event.key===' ')sortPeers('handshake')" tabindex="0" role="button">
+                        <th id="th-handshake" class="th-sortable" data-action="sort" data-sort="handshake" tabindex="0" role="button">
                             <?php echo t($lang, 'table.handshake'); ?> <span id="sort-handshake-icon" class="sort-icon">↕</span>
                         </th>
                         <th><?php echo t($lang, 'table.endpoint'); ?></th>
                         <?php if ($config['show_traffic_column'] ?? true): ?>
                         <th><?php echo t($lang, 'table.traffic'); ?></th>
                         <?php endif; ?>
-                        <th style="text-align: right;"><?php echo t($lang, 'table.actions'); ?></th>
+                        <th class="text-right"><?php echo t($lang, 'table.actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody id="peersTableBody">
@@ -205,27 +201,27 @@ try {
 
             <div class="empty-state" id="emptyState" style="display: none;">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.5 10.5a5.25 5.25 0 017 0M7.5 7.5a8.25 8.25 0 0113 0" /></svg>
-                <h3><?php echo t($lang, 'empty.title'); ?></h3>
-                <p><?php echo t($lang, 'empty.description'); ?></p>
+                <h3 id="emptyStateTitle"></h3>
+                <p id="emptyStateDesc"></p>
             </div>
 
             <div class="pagination" id="pagination" style="display:none;">
-                <button class="pagination-btn" id="prevPageBtn" onclick="goToPage(currentPage - 1)">‹</button>
+                <button class="pagination-btn" id="prevPageBtn" data-action="prev-page">‹</button>
                 <span class="pagination-info" id="paginationInfo"></span>
-                <button class="pagination-btn" id="nextPageBtn" onclick="goToPage(currentPage + 1)">›</button>
+                <button class="pagination-btn" id="nextPageBtn" data-action="next-page">›</button>
             </div>
         </div>
     </main>
 
     <!-- Add Peer Modal -->
-    <div class="modal-backdrop" id="addModalBackdrop" aria-hidden="true">
+    <div class="modal-backdrop" id="addModalBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="addModalHeading">
         <div class="modal">
             <div class="modal-header">
-                <h2 class="modal-heading"><?php echo t($lang, 'modal.add.title'); ?></h2>
-                <button class="close-btn" onclick="closeAddModal()" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
+                <h2 class="modal-heading" id="addModalHeading"><?php echo t($lang, 'modal.add.title'); ?></h2>
+                <button class="close-btn" data-action="close-modal" data-modal="addModalBackdrop" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
             </div>
 
-            <form id="addPeerForm" onsubmit="submitAddPeer(event)">
+            <form id="addPeerForm">
                 <div class="modal-body">
                     <div id="modalFormContent">
                         <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
@@ -253,13 +249,13 @@ try {
                         </div>
 
                         <div class="tab-buttons">
-                            <button type="button" class="tab-btn active" onclick="switchAddTab('conf')"><?php echo t($lang, 'modal.add.tab_conf'); ?></button>
-                            <button type="button" class="tab-btn" onclick="switchAddTab('script')"><?php echo t($lang, 'modal.add.tab_script'); ?></button>
+                            <button type="button" class="tab-btn active" data-action="add-tab" data-tab="conf"><?php echo t($lang, 'modal.add.tab_conf'); ?></button>
+                            <button type="button" class="tab-btn" data-action="add-tab" data-tab="script"><?php echo t($lang, 'modal.add.tab_script'); ?></button>
                         </div>
 
                         <div id="tab-conf" class="tab-content active">
                             <div class="code-box">
-                                <button type="button" class="copy-btn-code" onclick="copyToClipboard('code-conf-text')" title="<?php echo t($lang, 'modal.add.copy_title'); ?>">
+                                <button type="button" class="copy-btn-code" data-action="copy-code" data-target="code-conf-text" title="<?php echo t($lang, 'modal.add.copy_title'); ?>" aria-label="<?php echo t($lang, 'modal.add.copy_title'); ?>">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75A1.125 1.125 0 0 1 4.875 9.75H8.25m2.25 2.25h9.75c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75c0-.621.504-1.125 1.125-1.125Z" /></svg>
                                 </button>
                                 <pre id="code-conf-text"></pre>
@@ -271,7 +267,7 @@ try {
 
                         <div id="tab-script" class="tab-content">
                             <div class="code-box">
-                                <button type="button" class="copy-btn-code" onclick="copyToClipboard('code-script-text')" title="<?php echo t($lang, 'modal.add.copy_title'); ?>">
+                                <button type="button" class="copy-btn-code" data-action="copy-code" data-target="code-script-text" title="<?php echo t($lang, 'modal.add.copy_title'); ?>" aria-label="<?php echo t($lang, 'modal.add.copy_title'); ?>">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75A1.125 1.125 0 0 1 4.875 9.75H8.25m2.25 2.25h9.75c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75c0-.621.504-1.125 1.125-1.125Z" /></svg>
                                 </button>
                                 <pre id="code-script-text"></pre>
@@ -284,7 +280,7 @@ try {
                 </div>
 
                 <div class="modal-footer" id="modalFooterActions">
-                    <button type="button" class="btn btn-secondary" onclick="closeAddModal()"><?php echo t($lang, 'modal.add.cancel'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="addModalBackdrop"><?php echo t($lang, 'modal.add.cancel'); ?></button>
                     <button type="submit" class="btn btn-primary" id="btnSubmitAdd" data-orig-text="<?php echo t($lang, 'modal.add.submit'); ?>"><?php echo t($lang, 'modal.add.submit'); ?></button>
                 </div>
             </form>
@@ -292,14 +288,14 @@ try {
     </div>
 
     <!-- Edit Name Modal -->
-    <div class="modal-backdrop" id="editModalBackdrop" aria-hidden="true">
+    <div class="modal-backdrop" id="editModalBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="editModalHeading">
         <div class="modal">
             <div class="modal-header">
-                <h2 class="modal-heading"><?php echo t($lang, 'modal.edit.title'); ?></h2>
-                <button class="close-btn" onclick="closeEditModal()" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
+                <h2 class="modal-heading" id="editModalHeading"><?php echo t($lang, 'modal.edit.title'); ?></h2>
+                <button class="close-btn" data-action="close-modal" data-modal="editModalBackdrop" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
             </div>
 
-            <form id="editPeerForm" onsubmit="submitEditPeer(event)">
+            <form id="editPeerForm">
                 <input type="hidden" id="editPeerId">
                 <div class="modal-body">
                     <div class="form-group">
@@ -309,7 +305,7 @@ try {
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()"><?php echo t($lang, 'modal.edit.cancel'); ?></button>
+                    <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="editModalBackdrop"><?php echo t($lang, 'modal.edit.cancel'); ?></button>
                     <button type="submit" class="btn btn-primary"><?php echo t($lang, 'modal.edit.submit'); ?></button>
                 </div>
             </form>
@@ -317,11 +313,11 @@ try {
     </div>
 
     <!-- Delete Confirm Modal -->
-    <div class="modal-backdrop" id="deleteModalBackdrop" aria-hidden="true">
+    <div class="modal-backdrop" id="deleteModalBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="deleteModalHeading">
         <div class="modal" style="max-width: 450px;">
             <div class="modal-header">
-                <h2 class="modal-heading" style="color: var(--danger);"><?php echo t($lang, 'modal.delete.title'); ?></h2>
-                <button class="close-btn" onclick="closeDeleteModal()" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
+                <h2 class="modal-heading" id="deleteModalHeading" style="color: var(--danger);"><?php echo t($lang, 'modal.delete.title'); ?></h2>
+                <button class="close-btn" data-action="close-modal" data-modal="deleteModalBackdrop" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
             </div>
 
             <div class="modal-body">
@@ -332,18 +328,18 @@ try {
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()"><?php echo t($lang, 'modal.delete.cancel'); ?></button>
-                <button type="button" class="btn btn-danger" id="btnConfirmDelete"><?php echo t($lang, 'modal.delete.submit'); ?></button>
+                <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="deleteModalBackdrop"><?php echo t($lang, 'modal.delete.cancel'); ?></button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDelete" data-action="confirm-delete"><?php echo t($lang, 'modal.delete.submit'); ?></button>
             </div>
         </div>
     </div>
 
     <!-- Confirm Modal (generic) -->
-    <div class="modal-backdrop" id="confirmModalBackdrop" aria-hidden="true">
+    <div class="modal-backdrop" id="confirmModalBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirmModalHeading">
         <div class="modal" style="max-width: 450px;">
             <div class="modal-header">
-                <h2 class="modal-heading" style="color: var(--warning);"><?php echo t($lang, 'modal.confirm.title'); ?></h2>
-                <button class="close-btn" onclick="closeConfirmModal()" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
+                <h2 class="modal-heading" id="confirmModalHeading" style="color: var(--warning);"><?php echo t($lang, 'modal.confirm.title'); ?></h2>
+                <button class="close-btn" data-action="close-modal" data-modal="confirmModalBackdrop" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
             </div>
 
             <div class="modal-body">
@@ -351,18 +347,18 @@ try {
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()"><?php echo t($lang, 'modal.confirm.cancel'); ?></button>
-                <button type="button" class="btn btn-warning" id="btnConfirmAction"><?php echo t($lang, 'modal.confirm.submit'); ?></button>
+                <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="confirmModalBackdrop"><?php echo t($lang, 'modal.confirm.cancel'); ?></button>
+                <button type="button" class="btn btn-warning" id="btnConfirmAction" data-action="confirm-action"><?php echo t($lang, 'modal.confirm.submit'); ?></button>
             </div>
         </div>
     </div>
 
     <!-- Export Config Modal -->
-    <div class="modal-backdrop" id="exportModalBackdrop" aria-hidden="true">
+    <div class="modal-backdrop" id="exportModalBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="exportModalHeading">
         <div class="modal">
             <div class="modal-header">
-                <h2 class="modal-heading"><?php echo t($lang, 'modal.export.title'); ?></h2>
-                <button class="close-btn" onclick="closeExportModal()" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
+                <h2 class="modal-heading" id="exportModalHeading"><?php echo t($lang, 'modal.export.title'); ?></h2>
+                <button class="close-btn" data-action="close-modal" data-modal="exportModalBackdrop" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
             </div>
 
             <div class="modal-body">
@@ -378,7 +374,7 @@ try {
                 </div>
 
                 <div style="text-align:center; margin-bottom:1.25rem;">
-                    <button class="btn btn-warning btn-sm" id="btnRegenerateKey" onclick="regenerateKey()" style="width:100%;">
+                    <button class="btn btn-warning btn-sm" id="btnRegenerateKey" data-action="regenerate-key" style="width:100%;">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
                         <?php echo t($lang, 'modal.export.regenerate_btn'); ?>
                     </button>
@@ -389,13 +385,13 @@ try {
 
                 <div id="exportConfigSection" style="display:none;">
                     <div class="tab-buttons">
-                        <button type="button" class="tab-btn" id="tabBtnExportConf" onclick="switchExportTab('conf')"><?php echo t($lang, 'modal.export.tab_conf'); ?></button>
-                        <button type="button" class="tab-btn" id="tabBtnExportScript" onclick="switchExportTab('script')"><?php echo t($lang, 'modal.export.tab_script'); ?></button>
+                        <button type="button" class="tab-btn" id="tabBtnExportConf" data-action="export-tab" data-tab="conf"><?php echo t($lang, 'modal.export.tab_conf'); ?></button>
+                        <button type="button" class="tab-btn" id="tabBtnExportScript" data-action="export-tab" data-tab="script"><?php echo t($lang, 'modal.export.tab_script'); ?></button>
                     </div>
 
                     <div id="tab-export-conf" class="tab-content">
                         <div class="code-box">
-                            <button type="button" class="copy-btn-code" onclick="copyToClipboard('code-export-conf-text')" title="<?php echo t($lang, 'modal.add.copy_title'); ?>">
+                            <button type="button" class="copy-btn-code" data-action="copy-code" data-target="code-export-conf-text" title="<?php echo t($lang, 'modal.add.copy_title'); ?>" aria-label="<?php echo t($lang, 'modal.add.copy_title'); ?>">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75A1.125 1.125 0 0 1 4.875 9.75H8.25m2.25 2.25h9.75c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75c0-.621.504-1.125 1.125-1.125Z" /></svg>
                             </button>
                             <pre id="code-export-conf-text"></pre>
@@ -407,7 +403,7 @@ try {
 
                     <div id="tab-export-script" class="tab-content">
                         <div class="code-box">
-                            <button type="button" class="copy-btn-code" onclick="copyToClipboard('code-export-script-text')" title="<?php echo t($lang, 'modal.add.copy_title'); ?>">
+                            <button type="button" class="copy-btn-code" data-action="copy-code" data-target="code-export-script-text" title="<?php echo t($lang, 'modal.add.copy_title'); ?>" aria-label="<?php echo t($lang, 'modal.add.copy_title'); ?>">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75A1.125 1.125 0 0 1 4.875 9.75H8.25m2.25 2.25h9.75c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125v-9.75c0-.621.504-1.125 1.125-1.125Z" /></svg>
                             </button>
                             <pre id="code-export-script-text"></pre>
@@ -420,17 +416,17 @@ try {
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeExportModal()"><?php echo t($lang, 'modal.export.close'); ?></button>
+                <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="exportModalBackdrop"><?php echo t($lang, 'modal.export.close'); ?></button>
             </div>
         </div>
     </div>
 
     <!-- Export VPN IPs Modal -->
-    <div class="modal-backdrop" id="exportVpnIpsModalBackdrop" aria-hidden="true">
+    <div class="modal-backdrop" id="exportVpnIpsModalBackdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="exportVpnIpsModalHeading">
         <div class="modal" style="max-width:450px;">
             <div class="modal-header">
-                <h2 class="modal-heading"><?php echo t($lang, 'modal.export_vpn.title'); ?></h2>
-                <button class="close-btn" onclick="closeExportVpnIpsModal()" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
+                <h2 class="modal-heading" id="exportVpnIpsModalHeading"><?php echo t($lang, 'modal.export_vpn.title'); ?></h2>
+                <button class="close-btn" data-action="close-modal" data-modal="exportVpnIpsModalBackdrop" aria-label="<?php echo t($lang, 'modal.close'); ?>">&times;</button>
             </div>
             <div class="modal-body">
                 <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1.25rem;">
@@ -457,8 +453,8 @@ try {
                 </div>
             </div>
             <div class="modal-footer" id="exportVpnIpsFooter">
-                <button type="button" class="btn btn-secondary" onclick="closeExportVpnIpsModal()"><?php echo t($lang, 'modal.export_vpn.cancel'); ?></button>
-                <button type="button" class="btn btn-primary" id="btnExportVpnIps" onclick="submitExportVpnIps()">
+                <button type="button" class="btn btn-secondary" data-action="close-modal" data-modal="exportVpnIpsModalBackdrop"><?php echo t($lang, 'modal.export_vpn.cancel'); ?></button>
+                <button type="button" class="btn btn-primary" id="btnExportVpnIps" data-action="export-vpn-ips">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;margin-right:4px;vertical-align:middle;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                     <?php echo t($lang, 'modal.export_vpn.download'); ?>
                 </button>
@@ -467,12 +463,12 @@ try {
     </div>
 
     <!-- Toast Notification -->
-    <div class="toast" id="toast">
+    <div class="toast" id="toast" role="status" aria-live="polite">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" style="color: var(--success);" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
         <span id="toastText"><?php echo t($lang, 'toast.default'); ?></span>
     </div>
 
-    <script>
+    <script nonce="<?php echo $cspNonce; ?>">
         const AppConfig = {
             endpoint: <?php echo json_encode($config['endpoint']); ?>,
             clientAllowedIps: <?php echo json_encode($config['client_allowed_ips']); ?>,

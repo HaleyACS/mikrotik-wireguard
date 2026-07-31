@@ -44,6 +44,7 @@ let searchQuery = localStorage.getItem('searchQuery') || '';
 let highlightId = null;
 let pendingHighlightId = null;
 let currentPage = 1;
+let lastFocusedElement = null;
 
 
 /* ── Init ───────────────────────────────────────────────────── */
@@ -61,14 +62,67 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('searchInput').value = searchQuery;
     loadPeers().then(() => updateSortIcons());
     document.getElementById('searchInput').addEventListener('input', () => { currentPage = 1; applyFiltersAndSort(); });
+    document.getElementById('hideOfflineBtn').addEventListener('click', toggleHideOffline);
+    document.getElementById('serverSelector').addEventListener('change', (e) => switchServer(e.target.value));
+    document.getElementById('addPeerForm').addEventListener('submit', submitAddPeer);
+    document.getElementById('editPeerForm').addEventListener('submit', submitEditPeer);
+    document.addEventListener('click', handleDelegateClick);
+    document.addEventListener('keydown', handleDelegateKeydown);
 
     // Auto-refresh (pause when modals are open)
     setInterval(() => {
-        const anyModalOpen = ['addModalBackdrop', 'editModalBackdrop', 'deleteModalBackdrop', 'exportModalBackdrop']
-            .some(id => document.getElementById(id)?.classList.contains('active'));
-        if (!anyModalOpen) refreshPeers();
+        if (!document.querySelector('.modal-backdrop.active')) refreshPeers();
     }, AppConfig.refreshInterval);
 });
+
+function handleDelegateClick(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+    const action = el.dataset.action;
+    switch (action) {
+        case 'open-add': openAddModal(); break;
+        case 'open-export-vpn': openExportVpnIpsModal(); break;
+        case 'sort': sortPeers(el.dataset.sort); break;
+        case 'prev-page': goToPage(currentPage - 1); break;
+        case 'next-page': goToPage(currentPage + 1); break;
+        case 'close-modal': closeModalById(el.dataset.modal); break;
+        case 'add-tab': switchAddTab(el.dataset.tab); break;
+        case 'export-tab': switchExportTab(el.dataset.tab); break;
+        case 'copy-code': copyToClipboard(el.dataset.target); break;
+        case 'copy-name': copyNameToClipboard(el.dataset.value); break;
+        case 'copy-ip': copyIp(el.dataset.value); break;
+        case 'copy-dnat': copyDnatPort(el.dataset.value); break;
+        case 'export-peer': openExportModal(el.dataset.id, el.dataset.name, el.dataset.ip); break;
+        case 'toggle-peer': togglePeer(el.dataset.id, el.dataset.disabled === 'true'); break;
+        case 'edit-peer': openEditModal(el.dataset.id, el.dataset.name); break;
+        case 'delete-peer': openDeleteModal(el.dataset.id, el.dataset.name); break;
+        case 'confirm-delete': submitDeletePeer(peerToDeleteId); break;
+        case 'confirm-action': {
+            const cb = confirmCallback;
+            closeConfirmModal();
+            if (typeof cb === 'function') cb();
+            break;
+        }
+        case 'regenerate-key': regenerateKey(); break;
+        case 'export-vpn-ips': submitExportVpnIps(); break;
+    }
+}
+
+function handleDelegateKeydown(e) {
+    if (e.key === 'Escape') {
+        const topModal = document.querySelector('.modal-backdrop.active');
+        if (topModal) {
+            e.preventDefault();
+            closeModalById(topModal.id);
+        }
+        return;
+    }
+    const sortable = e.target.closest('[data-action="sort"]');
+    if (sortable && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        sortPeers(sortable.dataset.sort);
+    }
+}
 
 /* ── Data Loading ───────────────────────────────────────────── */
 async function loadPeers() {
@@ -94,10 +148,8 @@ async function loadPeers() {
     }
 }
 
-// Auto-refresh: silent, preserves scroll, no loader flicker
+// Auto-refresh: silent, no loader flicker
 async function refreshPeers() {
-    const tableWrapper = document.querySelector('.table-wrapper');
-    const savedScroll = tableWrapper?.scrollTop || 0;
     try {
         const res = await fetch(apiUrl('get_peers'));
         const data = await res.json();
@@ -106,7 +158,6 @@ async function refreshPeers() {
             AppConfig.serverPublicKey = data.server_public_key || '';
             applyFiltersAndSort();
             fetchInterfaceStatus();
-            if (tableWrapper) tableWrapper.scrollTop = savedScroll;
         }
     } catch {
         // silently ignore errors on auto-refresh
@@ -217,6 +268,11 @@ function handshakeToSeconds(h) {
     return total;
 }
 
+function dnatPort(ip) {
+    const parts = (ip || '').split('.');
+    return AppConfig.dnatBase + parseInt(parts[2] || 0) * AppConfig.dnatMultiplier + parseInt(parts[3] || 0);
+}
+
 function getSortedPeers(peers) {
     if (!currentSort.field) return peers;
     return [...peers].sort((a, b) => {
@@ -227,6 +283,9 @@ function getSortedPeers(peers) {
         } else if (currentSort.field === 'handshake') {
             va = handshakeToSeconds(a['handshake_formatted']);
             vb = handshakeToSeconds(b['handshake_formatted']);
+        } else if (currentSort.field === 'dnat') {
+            va = dnatPort(a['allowed-address']);
+            vb = dnatPort(b['allowed-address']);
         } else {
             va = ipToNum(a['allowed-address'] || '');
             vb = ipToNum(b['allowed-address'] || '');
@@ -248,7 +307,7 @@ function ipToNum(addr) {
 }
 
 function updateSortIcons() {
-    ['name', 'ip', 'handshake'].forEach(f => {
+    ['name', 'ip', 'dnat', 'handshake'].forEach(f => {
         const th = document.getElementById('th-' + f);
         const icon = document.getElementById('sort-' + f + '-icon');
         if (!th || !icon) return;
@@ -269,6 +328,15 @@ function renderPeers(peers) {
     tbody.innerHTML = '';
 
     if (peers.length === 0) {
+        const emptyTitle = document.getElementById('emptyStateTitle');
+        const emptyDesc = document.getElementById('emptyStateDesc');
+        if (allPeers.length > 0) {
+            emptyTitle.innerText = t('js.empty_no_results_title');
+            emptyDesc.innerText = t('js.empty_no_results_desc');
+        } else {
+            emptyTitle.innerText = t('js.empty_title');
+            emptyDesc.innerText = t('js.empty_description');
+        }
         emptyState.style.display = 'flex';
         document.getElementById('stat-active-peers').innerText = '0';
         document.getElementById('pagination').style.display = 'none';
@@ -290,20 +358,24 @@ function renderPeers(peers) {
         let isActive = isPeerActive(peer);
 
         const endpoint = peer['current-endpoint-address'] || t('js.endpoint_na');
+        const ip = (peer['allowed-address'] || '').split('/')[0];
+        const peerName = peer.name || t('js.unnamed');
+        const peerId = peer['.id'] || '';
+        const allowedAddress = peer['allowed-address'] || '';
 
         const tr = document.createElement('tr');
-        tr.setAttribute('data-peer-ip', (peer['allowed-address'] || '').split('/')[0]);
+        tr.setAttribute('data-peer-ip', ip);
         if (peer.disabled) tr.classList.add('row-disabled');
         tr.innerHTML = `
             <td data-label="${t('js.col_name')}">
-                <span class="peer-name" style="cursor:pointer;" onclick="copyNameToClipboard('${escapeJs(peer.name || t('js.unnamed'))}')" title="${t('js.copy_name_title')}">${escapeHtml(peer.name || t('js.unnamed'))}</span>
+                <button type="button" class="peer-name btn-copy" data-action="copy-name" data-value="${escapeHtml(peerName)}" title="${t('js.copy_name_title')}" aria-label="${t('js.copy_name_title')}">${escapeHtml(peerName)}</button>
                 ${peer.disabled ? `<span class="badge-disabled">${t('js.disabled_badge')}</span>` : ''}
             </td>
             <td data-label="${t('js.col_ip')}">
-                <span class="peer-ip-badge" style="cursor:pointer;" onclick="copyIp('${escapeJs(peer['allowed-address'].split('/')[0])}')" title="${t('js.copy_ip_title')}">${escapeHtml(peer['allowed-address'].split('/')[0])}</span>
+                <button type="button" class="peer-ip-badge btn-copy" data-action="copy-ip" data-value="${escapeHtml(ip)}" title="${t('js.copy_ip_title')}" aria-label="${t('js.copy_ip_title')}">${escapeHtml(ip)}</button>
             </td>
             ${AppConfig.showDnatColumn ? `<td data-label="${t('js.col_dnat_port')}">
-                <span class="peer-ip-badge" style="cursor:pointer;" onclick="copyDnatPort('${escapeJs(peer['allowed-address'].split('/')[0])}')" title="${t('js.copy_port_title')}">${AppConfig.dnatBase + parseInt(peer['allowed-address'].split('/')[0].split('.')[2]) * AppConfig.dnatMultiplier + parseInt(peer['allowed-address'].split('/')[0].split('.')[3])}</span>
+                <button type="button" class="peer-ip-badge btn-copy" data-action="copy-dnat" data-value="${escapeHtml(ip)}" title="${t('js.copy_port_title')}" aria-label="${t('js.copy_port_title')}">${dnatPort(ip)}</button>
             </td>` : ''}
             <td data-label="${t('js.col_handshake')}">
                 <div class="handshake-cell">
@@ -323,20 +395,20 @@ function renderPeers(peers) {
                     <span class="traffic-val">↑ ${escapeHtml(peer.tx_formatted)}</span>
                 </div>
             </td>` : ''}
-            <td data-label="${t('js.col_actions')}" style="text-align:right;">
+            <td data-label="${t('js.col_actions')}" class="text-right">
                 <div class="actions-cell">
-                    <button class="icon-btn" onclick="openExportModal('${escapeJs(peer['.id'])}','${escapeJs(peer.name)}','${escapeJs(peer['allowed-address'])}')" title="${t('js.download_title')}">
+                    <button class="icon-btn" data-action="export-peer" data-id="${escapeHtml(peerId)}" data-name="${escapeHtml(peerName)}" data-ip="${escapeHtml(allowedAddress)}" title="${t('js.download_title')}" aria-label="${t('js.download_title')}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                     </button>
-                    <button class="icon-btn ${peer.disabled ? '' : 'icon-btn-toggle-on'}" onclick="togglePeer('${escapeJs(peer['.id'])}', ${peer.disabled})" title="${peer.disabled ? t('js.toggle_enable_title') : t('js.toggle_disable_title')}">
+                    <button class="icon-btn ${peer.disabled ? '' : 'icon-btn-toggle-on'}" data-action="toggle-peer" data-id="${escapeHtml(peerId)}" data-disabled="${peer.disabled}" title="${peer.disabled ? t('js.toggle_enable_title') : t('js.toggle_disable_title')}" aria-label="${peer.disabled ? t('js.toggle_enable_title') : t('js.toggle_disable_title')}">
                         ${peer.disabled
                 ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>'
                 : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9A2.25 2.25 0 0 1 5.25 16.5v-9Z"/></svg>'}
                     </button>
-                    <button class="icon-btn" onclick="openEditModal('${escapeJs(peer['.id'])}','${escapeJs(peer.name)}')" title="${t('js.edit_title')}">
+                    <button class="icon-btn" data-action="edit-peer" data-id="${escapeHtml(peerId)}" data-name="${escapeHtml(peerName)}" title="${t('js.edit_title')}" aria-label="${t('js.edit_title')}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
                     </button>
-                    <button class="icon-btn icon-btn-danger" onclick="openDeleteModal('${escapeJs(peer['.id'])}','${escapeJs(peer.name)}')" title="${t('js.delete_title')}">
+                    <button class="icon-btn icon-btn-danger" data-action="delete-peer" data-id="${escapeHtml(peerId)}" data-name="${escapeHtml(peerName)}" title="${t('js.delete_title')}" aria-label="${t('js.delete_title')}">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>
                     </button>
                 </div>
@@ -383,7 +455,7 @@ function goToPage(page) {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
     applyFiltersAndSort();
-    document.querySelector('.table-wrapper')?.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ── Session check ───────────────────────────────────────────── */
@@ -446,6 +518,40 @@ function releaseFocus(modalElement) {
     }
 }
 
+/* ── Generic modal helpers ──────────────────────────────────── */
+function openModal(id) {
+    const backdrop = document.getElementById(id);
+    if (!backdrop) return;
+    lastFocusedElement = document.activeElement;
+    backdrop.classList.add('active');
+    backdrop.setAttribute('aria-hidden', 'false');
+    trapFocus(backdrop);
+}
+
+function closeModal(id) {
+    const backdrop = document.getElementById(id);
+    if (!backdrop) return;
+    backdrop.classList.remove('active');
+    backdrop.setAttribute('aria-hidden', 'true');
+    releaseFocus(backdrop);
+    if (lastFocusedElement) lastFocusedElement.focus();
+    lastFocusedElement = null;
+}
+
+const CLOSE_HANDLERS = {
+    'addModalBackdrop': closeAddModal,
+    'editModalBackdrop': closeEditModal,
+    'deleteModalBackdrop': closeDeleteModal,
+    'confirmModalBackdrop': closeConfirmModal,
+    'exportModalBackdrop': closeExportModal,
+    'exportVpnIpsModalBackdrop': closeExportVpnIpsModal
+};
+
+function closeModalById(id) {
+    const fn = CLOSE_HANDLERS[id];
+    if (fn) fn();
+}
+
 /* ── Add Peer Modal ─────────────────────────────────────────── */
 async function openAddModal() {
     if (!(await checkSession())) return;
@@ -455,21 +561,15 @@ async function openAddModal() {
     document.getElementById('modalResultContent').style.display = 'none';
     document.getElementById('modalFooterActions').style.display = 'flex';
     document.getElementById('peerName').value = '';
-    const backdrop = document.getElementById('addModalBackdrop');
-    backdrop.classList.add('active');
-    backdrop.setAttribute('aria-hidden', 'false');
-    trapFocus(backdrop);
-    document.getElementById('peerName').focus();
     const submitBtn = document.getElementById('btnSubmitAdd');
     submitBtn.disabled = false;
     submitBtn.innerText = submitBtn.dataset.origText || 'Create Peer';
+    openModal('addModalBackdrop');
+    document.getElementById('peerName').focus();
 }
 
 function closeAddModal() {
-    const backdrop = document.getElementById('addModalBackdrop');
-    backdrop.classList.remove('active');
-    backdrop.setAttribute('aria-hidden', 'true');
-    releaseFocus(backdrop);
+    closeModal('addModalBackdrop');
     loadPeers();
 }
 
@@ -519,10 +619,10 @@ function switchAddTab(tab) {
     modal.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     if (tab === 'script') {
         document.getElementById('tab-script').classList.add('active');
-        modal.querySelector('[onclick="switchAddTab(\'script\')"]')?.classList.add('active');
+        modal.querySelector('[data-tab="script"]')?.classList.add('active');
     } else {
         document.getElementById('tab-conf').classList.add('active');
-        modal.querySelector('[onclick="switchAddTab(\'conf\')"]')?.classList.add('active');
+        modal.querySelector('[data-tab="conf"]')?.classList.add('active');
     }
 }
 
@@ -548,18 +648,12 @@ async function openEditModal(id, name) {
     highlightId = null;
     document.getElementById('editPeerId').value = id;
     document.getElementById('editPeerName').value = name;
-    const backdrop = document.getElementById('editModalBackdrop');
-    backdrop.classList.add('active');
-    backdrop.setAttribute('aria-hidden', 'false');
-    trapFocus(backdrop);
+    openModal('editModalBackdrop');
     document.getElementById('editPeerName').focus();
 }
 
 function closeEditModal() {
-    const backdrop = document.getElementById('editModalBackdrop');
-    backdrop.classList.remove('active');
-    backdrop.setAttribute('aria-hidden', 'true');
-    releaseFocus(backdrop);
+    closeModal('editModalBackdrop');
 }
 
 async function submitEditPeer(event) {
@@ -583,21 +677,11 @@ async function openDeleteModal(id, name) {
     if (!(await checkSession())) return;
     peerToDeleteId = id;
     document.getElementById('deletePeerNameText').innerText = name;
-    const btn = document.getElementById('btnConfirmDelete');
-    const clone = btn.cloneNode(true);
-    btn.parentNode.replaceChild(clone, btn);
-    clone.addEventListener('click', () => submitDeletePeer(peerToDeleteId));
-    const backdrop = document.getElementById('deleteModalBackdrop');
-    backdrop.classList.add('active');
-    backdrop.setAttribute('aria-hidden', 'false');
-    trapFocus(backdrop);
+    openModal('deleteModalBackdrop');
 }
 
 function closeDeleteModal() {
-    const backdrop = document.getElementById('deleteModalBackdrop');
-    backdrop.classList.remove('active');
-    backdrop.setAttribute('aria-hidden', 'true');
-    releaseFocus(backdrop);
+    closeModal('deleteModalBackdrop');
     peerToDeleteId = null;
 }
 
@@ -605,27 +689,13 @@ function closeDeleteModal() {
 let confirmCallback = null;
 
 function openConfirmModal(message, callback) {
-    const backdrop = document.getElementById('confirmModalBackdrop');
     document.getElementById('confirmModalText').innerText = message;
     confirmCallback = callback;
-    const btn = document.getElementById('btnConfirmAction');
-    const clone = btn.cloneNode(true);
-    btn.parentNode.replaceChild(clone, btn);
-    clone.addEventListener('click', () => {
-        const cb = confirmCallback;
-        closeConfirmModal();
-        if (typeof cb === 'function') cb();
-    });
-    backdrop.classList.add('active');
-    backdrop.setAttribute('aria-hidden', 'false');
-    trapFocus(backdrop);
+    openModal('confirmModalBackdrop');
 }
 
 function closeConfirmModal() {
-    const backdrop = document.getElementById('confirmModalBackdrop');
-    backdrop.classList.remove('active');
-    backdrop.setAttribute('aria-hidden', 'true');
-    releaseFocus(backdrop);
+    closeModal('confirmModalBackdrop');
     confirmCallback = null;
 }
 
@@ -673,11 +743,10 @@ async function openExportModal(id, name, allowedAddress) {
     exportPeerName = name;
     exportPeerIp = allowedAddress.split('/')[0];
 
-    const parts = exportPeerIp.split('.');
-    const dnatPort = AppConfig.dnatBase + parseInt(parts[2]) * AppConfig.dnatMultiplier + parseInt(parts[3]);
+    const dnatPortValue = dnatPort(exportPeerIp);
 
     document.getElementById('exportIp').innerText = exportPeerIp;
-    document.getElementById('exportPort').innerText = dnatPort;
+    document.getElementById('exportPort').innerText = dnatPortValue;
 
     // Hide config tabs, show only IP/port + generate button
     document.getElementById('exportConfigSection').style.display = 'none';
@@ -687,10 +756,7 @@ async function openExportModal(id, name, allowedAddress) {
         ${t('js.regenerate_btn')}`;
 
     switchExportTab(AppConfig.exportMode === 'conf' ? 'conf' : 'script');
-    const backdrop = document.getElementById('exportModalBackdrop');
-    backdrop.classList.add('active');
-    backdrop.setAttribute('aria-hidden', 'false');
-    trapFocus(backdrop);
+    openModal('exportModalBackdrop');
 }
 
 function updateExportConfig(data) {
@@ -736,10 +802,7 @@ async function regenerateKey() {
 }
 
 function closeExportModal() {
-    const backdrop = document.getElementById('exportModalBackdrop');
-    backdrop.classList.remove('active');
-    backdrop.setAttribute('aria-hidden', 'true');
-    releaseFocus(backdrop);
+    closeModal('exportModalBackdrop');
 }
 
 function switchExportTab(tab) {
@@ -756,10 +819,9 @@ function switchExportTab(tab) {
 
 /* ── Clipboard ──────────────────────────────────────────────── */
 function copyDnatPort(ip) {
-    const parts = ip.split('.');
-    const dnatPort = AppConfig.dnatBase + parseInt(parts[2]) * AppConfig.dnatMultiplier + parseInt(parts[3]);
-    navigator.clipboard.writeText(dnatPort.toString())
-        .then(() => showToast(t('js.dnat_copied').replace('%d', dnatPort)))
+    const dnatPortValue = dnatPort(ip);
+    navigator.clipboard.writeText(dnatPortValue.toString())
+        .then(() => showToast(t('js.dnat_copied').replace('%d', dnatPortValue)))
         .catch(() => showToast(t('js.copy_failed'), true));
 }
 
@@ -791,17 +853,11 @@ async function openExportVpnIpsModal() {
     const btn = document.getElementById('btnExportVpnIps');
     btn.disabled = false;
     btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;margin-right:4px;vertical-align:middle;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg> ${t('js.export_vpn_download')}`;
-    document.getElementById('exportVpnIpsModalBackdrop').classList.add('active');
-    const backdrop = document.getElementById('exportVpnIpsModalBackdrop');
-    backdrop.setAttribute('aria-hidden', 'false');
-    trapFocus(backdrop);
+    openModal('exportVpnIpsModalBackdrop');
 }
 
 function closeExportVpnIpsModal() {
-    const backdrop = document.getElementById('exportVpnIpsModalBackdrop');
-    backdrop.classList.remove('active');
-    backdrop.setAttribute('aria-hidden', 'true');
-    releaseFocus(backdrop);
+    closeModal('exportVpnIpsModalBackdrop');
 }
 
 async function submitExportVpnIps() {
@@ -857,9 +913,4 @@ function showToast(message, isError = false) {
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
-
-function escapeJs(str) {
-    if (!str) return '';
-    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/`/g, '\\`');
 }

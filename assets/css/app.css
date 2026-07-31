@@ -198,6 +198,17 @@ header {
     border-color: transparent;
 }
 
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.th-sortable:focus-visible,
+.copy-btn-code:focus-visible,
+.btn-copy:focus-visible,
+.close-btn:focus-visible,
+.pagination-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
 .server-selector option {
     background: #1e293b;
     color: var(--text-color);
@@ -509,6 +520,19 @@ tr:hover td {
     background: rgba(255, 255, 255, .01);
 }
 
+/* Copy targets in the table (button reset) — placed before .peer-name/.peer-ip-badge
+   so the badge classes can re-apply their visual styles. */
+.btn-copy {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
 .peer-name {
     font-weight: 500;
     color: var(--text-color);
@@ -676,6 +700,7 @@ tr:hover td {
     justify-content: center;
     z-index: 100;
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
     transition: var(--transition-smooth);
     padding: 1rem;
@@ -683,6 +708,7 @@ tr:hover td {
 
 .modal-backdrop.active {
     opacity: 1;
+    visibility: visible;
     pointer-events: all;
 }
 
@@ -960,25 +986,6 @@ tr:hover td {
     }
 }
 
-/* ── Footer ─────────────────────────────────────────────────── */
-footer {
-    text-align: center;
-    padding: 2rem;
-    color: var(--text-muted);
-    font-size: .85rem;
-    border-top: 1px solid var(--border-color);
-    margin-top: auto;
-}
-
-footer a {
-    color: var(--primary);
-    text-decoration: none;
-}
-
-footer a:hover {
-    text-decoration: underline;
-}
-
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 768px) {
     header {
@@ -1145,4 +1152,16 @@ tr.row-disabled .peer-name {
     color: var(--danger);
     border-color: rgba(239, 68, 68, .4);
     background: rgba(239, 68, 68, .1);
+}
+
+/* ── Reduced Motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

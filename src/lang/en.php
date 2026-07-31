@@ -32,8 +32,6 @@ return [
     // ── Search / Toolbar ───────────────────────────────────────
     'search.placeholder'     => 'Search peer by name or IP address...',
     'search.hide_offline_title' => 'Hide offline peers',
-    'search.hide_offline'    => 'Hide offline',
-    'search.show_all'        => 'Show all',
     'search.add_peer'        => 'Add New Peer',
 
     // ── Table ──────────────────────────────────────────────────
@@ -46,9 +44,7 @@ return [
     'table.dnat_port'        => 'DNAT Port',
     'table.actions'          => 'Actions',
 
-    // ── Empty state ────────────────────────────────────────────
-    'empty.title'            => 'No peers found',
-    'empty.description'      => 'No clients configured on this WireGuard interface.',
+    // ── Empty state (filled by JS) ─────────────────────────────
 
     // ── Add Peer Modal ─────────────────────────────────────────
     'modal.add.title'            => 'Add New WireGuard Peer',
@@ -103,7 +99,6 @@ return [
     'modal.export_vpn.include_pptp'  => 'Include PPTP secret IPs',
     'modal.export_vpn.download'      => 'Download',
     'modal.export_vpn.cancel'        => 'Cancel',
-    'modal.export_vpn.close'         => 'Close',
     'modal.export_vpn.success_title' => 'Export Completed',
     'modal.export_vpn.stats_wg'      => 'WireGuard IPs:',
     'modal.export_vpn.stats_sstp' => 'SSTP:',
@@ -147,7 +142,6 @@ return [
     'js.col_traffic'          => 'Traffic',
     'js.col_dnat_port'        => 'DNAT Port',
     'js.col_actions'          => 'Actions',
-    'js.export_vpn_btn'         => 'Export VPN IPs',
     'js.export_vpn_download'    => 'Download',
     'js.exporting'              => 'Exporting...',
     'js.export_error'           => 'Export error: %s',
@@ -159,12 +153,9 @@ return [
     'js.peer_disabled'        => 'Peer disabled successfully!',
     'js.peer_enabled'         => 'Peer enabled successfully!',
     'js.toggle_error'         => 'Error toggling peer: %s',
-    'js.interface_running'    => 'Running',
-    'js.interface_stopped'    => 'Stopped',
     'js.interface_disabled'   => 'Interface disabled',
 
     'js.regenerate_btn'       => 'Regenerate Key & Download Config',
-    'js.script_comment_header' => 'Paste this code in your MikroTik terminal',
     'js.regenerate_error'     => 'Error: %s',
     'js.dnat_copied'          => 'Winbox Port (DNAT): %d copied!',
     'js.code_copy_failed'     => 'Unable to copy code automatically.',
@@ -181,7 +172,6 @@ return [
     'js.creating'             => 'Creating...',
     'js.peer_created'         => 'WireGuard peer added successfully!',
     'js.create_error'         => 'Error during creation: %s',
-    'js.api_error'            => 'API connection error.',
     'js.file_downloaded'      => 'File %s downloaded!',
     'js.peer_updated'         => 'Peer name updated successfully!',
     'js.update_error'         => 'Error during update: %s',
@@ -193,8 +183,11 @@ return [
     'js.config_updated'       => 'Configuration Updated',
     'js.error_prefix'         => 'Error: %s',
     'js.pagination_info'      => 'Page %d of %d (%d total)',
+    'js.empty_title'          => 'No peers found',
+    'js.empty_description'    => 'No clients configured on this WireGuard interface.',
+    'js.empty_no_results_title' => 'No results',
+    'js.empty_no_results_desc'  => 'No peers match your current search or filter.',
 
-    'js.port_copied'          => 'Winbox Port (DNAT): %d copied!',
     'js.copy_failed'          => 'Unable to copy.',
     'js.name_copied'          => 'Name copied to clipboard!',
     'js.ip_copied'            => 'IP copied to clipboard!',
@@ -202,5 +195,4 @@ return [
     'js.copy_ip_title'        => 'Copy IP',
     'js.code_copied'          => 'Code copied to clipboard!',
     'js.code_auto_copied'     => 'Config copied to clipboard!',
-    'js.copy_auto_failed'     => 'Unable to copy code automatically.',
 ];

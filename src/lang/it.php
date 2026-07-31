@@ -32,8 +32,6 @@ return [
     // ── Search / Toolbar ───────────────────────────────────────
     'search.placeholder'          => 'Cerca peer per nome o indirizzo IP...',
     'search.hide_offline_title'   => 'Nascondi peer offline',
-    'search.hide_offline'         => 'Nascondi offline',
-    'search.show_all'             => 'Mostra tutti',
     'search.add_peer'             => 'Aggiungi Nuovo Peer',
 
     // ── Table ──────────────────────────────────────────────────
@@ -46,9 +44,7 @@ return [
     'table.dnat_port'        => 'DNAT',
     'table.actions'          => 'Azioni',
 
-    // ── Empty state ────────────────────────────────────────────
-    'empty.title'            => 'Nessun peer trovato',
-    'empty.description'      => 'Non è presente alcun client configurato su questa interfaccia WireGuard.',
+    // ── Empty state (filled by JS) ─────────────────────────────
 
     // ── Add Peer Modal ─────────────────────────────────────────
     'modal.add.title'            => 'Aggiungi Nuovo Peer WireGuard',
@@ -103,7 +99,6 @@ return [
     'modal.export_vpn.include_pptp'  => 'Includi IP segreti PPTP',
     'modal.export_vpn.download'      => 'Scarica',
     'modal.export_vpn.cancel'        => 'Annulla',
-    'modal.export_vpn.close'         => 'Chiudi',
     'modal.export_vpn.success_title' => 'Esportazione completata',
     'modal.export_vpn.stats_wg'      => 'IP WireGuard:',
     'modal.export_vpn.stats_sstp' => 'SSTP:',
@@ -147,7 +142,6 @@ return [
     'js.col_traffic'          => 'Traffico',
     'js.col_dnat_port'        => 'Porta DNAT',
     'js.col_actions'          => 'Azioni',
-    'js.export_vpn_btn'         => 'Esporta IP VPN',
     'js.export_vpn_download'    => 'Scarica',
     'js.exporting'              => 'Esportazione...',
     'js.export_error'           => 'Errore esportazione: %s',
@@ -159,12 +153,9 @@ return [
     'js.peer_disabled'        => 'Peer disattivato con successo!',
     'js.peer_enabled'         => 'Peer attivato con successo!',
     'js.toggle_error'         => 'Errore durante l\'attivazione/disattivazione: %s',
-    'js.interface_running'    => 'Attiva',
-    'js.interface_stopped'    => 'Ferma',
     'js.interface_disabled'   => 'Interfaccia disabilitata',
 
     'js.regenerate_btn'       => 'Rigenera Chiave & Scarica Config',
-    'js.script_comment_header' => 'Incolla questo codice nel terminale del tuo MikroTik',
     'js.regenerate_error'     => 'Errore: %s',
     'js.dnat_copied'          => 'Porta Winbox (DNAT): %d copiata!',
     'js.code_copy_failed'     => 'Impossibile copiare il codice automaticamente.',
@@ -181,7 +172,6 @@ return [
     'js.creating'             => 'Creazione...',
     'js.peer_created'         => 'Peer WireGuard aggiunto con successo!',
     'js.create_error'         => 'Errore durante la creazione: %s',
-    'js.api_error'            => 'Errore di connessione API.',
     'js.file_downloaded'      => 'File %s scaricato!',
     'js.peer_updated'         => 'Nome peer aggiornato con successo!',
     'js.update_error'         => 'Errore durante la modifica: %s',
@@ -193,8 +183,11 @@ return [
     'js.config_updated'       => 'Configurazione Aggiornata',
     'js.error_prefix'         => 'Errore: %s',
     'js.pagination_info'      => 'Pagina %d di %d (%d totali)',
+    'js.empty_title'          => 'Nessun peer trovato',
+    'js.empty_description'    => 'Non è presente alcun client configurato su questa interfaccia WireGuard.',
+    'js.empty_no_results_title' => 'Nessun risultato',
+    'js.empty_no_results_desc'  => 'Nessun peer corrisponde alla ricerca o al filtro corrente.',
 
-    'js.port_copied'          => 'Porta Winbox (DNAT): %d copiata!',
     'js.copy_failed'          => 'Impossibile copiare.',
     'js.name_copied'          => 'Nome copiato negli appunti!',
     'js.ip_copied'            => 'IP copiato negli appunti!',
@@ -202,5 +195,4 @@ return [
     'js.copy_ip_title'        => 'Copia IP',
     'js.code_copied'          => 'Codice copiato negli appunti!',
     'js.code_auto_copied'     => 'Configurazione copiata negli appunti!',
-    'js.copy_auto_failed'     => 'Impossibile copiare il codice automaticamente.',
 ];

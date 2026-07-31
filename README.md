@@ -134,7 +134,7 @@ Winbox connection: `CHR_IP:30024`
 php tests/run_tests.php
 ```
 
-Uses a mock REST client — no real router needed. 296 assertions covering key generation, IP allocation, config formatting, API interaction, peer CRUD (incl. collision detection), config validation, URL construction, authentication, brute-force lockout, session management, interface status, multi-server config resolution, and export mode validation across 133 tests.
+Uses a mock REST client — no real router needed. 296 assertions covering key generation, IP allocation, config formatting, API interaction, peer CRUD (incl. collision detection), config validation, URL construction, authentication, brute-force lockout, session management, interface status, multi-server config resolution, and export mode validation across 134 tests.
 
 > **Disclaimer:** This software is provided "as is" without warranty of any kind. The author assumes no responsibility for any direct or indirect damages arising from its use. Use at your own risk.
 
