@@ -422,4 +422,189 @@ class WireGuardManagerTest extends TestCase {
         ];
         $this->assertEquals(['3.0.0.2'], WireGuardManager::extractUniqueIpv4Addresses($peers));
     }
+
+    private function peerMock(): MockMikrotikRestClient {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', [
+            [
+                '.id' => '*1c',
+                'interface' => 'WireGuard-ResNovae',
+                'name' => 'Cliente-X',
+                'public-key' => 'OLD_PUBLIC_KEY',
+                'allowed-address' => '3.0.0.2/32',
+            ]
+        ]);
+        $mockClient->setResponse('GET', '/interface/wireguard', [
+            ['name' => 'WireGuard-ResNovae', 'public-key' => 'SERVER_PUBLIC_KEY']
+        ]);
+        $mockClient->setResponse('PATCH', '/interface/wireguard/peers/*1c', []);
+        return $mockClient;
+    }
+
+    private function peerManagerConfig(): array {
+        return [
+            'interface' => 'WireGuard-ResNovae',
+            'subnet' => '3.0.0.0/24',
+            'server_ip' => '3.0.0.1',
+            'endpoint' => 'vpn.example.com:13231',
+            'client_allowed_ips' => '3.0.0.0/24,192.168.111.0/24'
+        ];
+    }
+
+    public function testFindPeerByName() {
+        $manager = new WireGuardManager($this->peerMock(), $this->peerManagerConfig());
+        $peer = $manager->findPeerByName('Cliente-X');
+        $this->assertNotNull($peer);
+        $this->assertEquals('*1c', $peer['.id']);
+        $this->assertEquals('3.0.0.2/32', $peer['allowed-address']);
+    }
+
+    public function testFindPeerByNameCaseInsensitive() {
+        $manager = new WireGuardManager($this->peerMock(), $this->peerManagerConfig());
+        $peer = $manager->findPeerByName('cliente-x');
+        $this->assertNotNull($peer, 'Lookup should be case-insensitive');
+    }
+
+    public function testFindPeerByNameNotFound() {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+        $this->assertNull($manager->findPeerByName('Inesistente'));
+    }
+
+    public function testRegeneratePeer() {
+        $mockClient = $this->peerMock();
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $result = $manager->regeneratePeer('Cliente-X');
+
+        $this->assertEquals('Cliente-X', $result['name']);
+        $this->assertEquals('3.0.0.2', $result['ip'], 'IP should stay unchanged after regeneration');
+        $this->assertTrue(isset($result['private_key']), 'Private key should be set');
+        $this->assertTrue(isset($result['public_key']), 'Public key should be set');
+        $this->assertTrue(str_contains($result['config'], '[Interface]'), 'Config should be generated');
+        $this->assertTrue(str_contains($result['script'], 'MikroTik Client Setup Script'), 'Script should be generated');
+
+        $patchRequest = null;
+        foreach ($mockClient->history as $req) {
+            if ($req['method'] === 'PATCH' && $req['path'] === '/interface/wireguard/peers/*1c') {
+                $patchRequest = $req;
+                break;
+            }
+        }
+        $this->assertNotEmpty($patchRequest, 'A PATCH request should have been made to regenerate key');
+        $this->assertEquals($result['public_key'], $patchRequest['data']['public-key']);
+    }
+
+    public function testRegeneratePeerNotFound() {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $threw = false;
+        try {
+            $manager->regeneratePeer('Inesistente');
+        } catch (Exception $e) {
+            $threw = true;
+            $this->assertTrue(str_contains($e->getMessage(), 'not found'));
+        }
+        $this->assertTrue($threw, 'Expected exception for unknown peer name');
+    }
+
+    public function testRegeneratePeerCaseInsensitive() {
+        $manager = new WireGuardManager($this->peerMock(), $this->peerManagerConfig());
+        $result = $manager->regeneratePeer('cliente-x');
+        $this->assertEquals('Cliente-X', $result['name']);
+        $this->assertEquals('3.0.0.2', $result['ip']);
+    }
+
+    public function testDeletePeerByName() {
+        $mockClient = $this->peerMock();
+        $mockClient->setResponse('DELETE', '/interface/wireguard/peers/*1c', []);
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $result = $manager->deletePeerByName('Cliente-X');
+
+        $this->assertEquals('Cliente-X', $result['name']);
+        $this->assertEquals('3.0.0.2', $result['ip']);
+
+        $deleteRequest = null;
+        foreach ($mockClient->history as $req) {
+            if ($req['method'] === 'DELETE' && $req['path'] === '/interface/wireguard/peers/*1c') {
+                $deleteRequest = $req;
+                break;
+            }
+        }
+        $this->assertNotEmpty($deleteRequest, 'A DELETE request should have been made to remove the peer');
+    }
+
+    public function testDeletePeerByNameNotFound() {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $threw = false;
+        try {
+            $manager->deletePeerByName('Inesistente');
+        } catch (Exception $e) {
+            $threw = true;
+            $this->assertTrue(str_contains($e->getMessage(), 'not found'));
+        }
+        $this->assertTrue($threw, 'Expected exception for unknown peer name');
+    }
+
+    public function testTogglePeerByNameDisable() {
+        $mockClient = $this->peerMock();
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $result = $manager->togglePeerByName('Cliente-X', true);
+
+        $this->assertEquals('Cliente-X', $result['name']);
+        $this->assertEquals('3.0.0.2', $result['ip']);
+        $this->assertTrue($result['disabled']);
+
+        $patchRequest = null;
+        foreach ($mockClient->history as $req) {
+            if ($req['method'] === 'PATCH' && $req['path'] === '/interface/wireguard/peers/*1c') {
+                $patchRequest = $req;
+                break;
+            }
+        }
+        $this->assertNotEmpty($patchRequest, 'A PATCH request should have been made to disable the peer');
+        $this->assertEquals('yes', $patchRequest['data']['disabled']);
+    }
+
+    public function testTogglePeerByNameEnable() {
+        $mockClient = $this->peerMock();
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $result = $manager->togglePeerByName('Cliente-X', false);
+
+        $this->assertFalse($result['disabled']);
+
+        $patchRequest = null;
+        foreach ($mockClient->history as $req) {
+            if ($req['method'] === 'PATCH' && $req['path'] === '/interface/wireguard/peers/*1c') {
+                $patchRequest = $req;
+                break;
+            }
+        }
+        $this->assertNotEmpty($patchRequest, 'A PATCH request should have been made to enable the peer');
+        $this->assertEquals('no', $patchRequest['data']['disabled']);
+    }
+
+    public function testTogglePeerByNameNotFound() {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+        $manager = new WireGuardManager($mockClient, $this->peerManagerConfig());
+
+        $threw = false;
+        try {
+            $manager->togglePeerByName('Inesistente', true);
+        } catch (Exception $e) {
+            $threw = true;
+            $this->assertTrue(str_contains($e->getMessage(), 'not found'));
+        }
+        $this->assertTrue($threw, 'Expected exception for unknown peer name');
+    }
 }

@@ -21,3 +21,20 @@
 Require ip 192.168.111
 # Require ip 10.0.0.0/8
 # Require ip 172.16.0.0/12
+
+# ──────────────────────────────────────────────────────
+# Force Authorization header forwarding to PHP-FPM/FastCGI
+# (Apache di default rimuove l'header Authorization nelle richieste a script PHP)
+# Aggiungere questa riga anche nel .htaccess LIVE (non solo nel template).
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+# ──────────────────────────────────────────────────────
+# Block direct access to dotfiles (.admin-hash, .api-token, .htaccess)
+# ──────────────────────────────────────────────────────
+# REQUIRED if the document root is this project folder:
+# without this, a browser could download .api-token (the API
+# token) or .admin-hash as plain text.
+# After enabling, verify with:  https://your-host/.api-token  -> 403
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

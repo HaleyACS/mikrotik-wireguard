@@ -285,6 +285,26 @@ class WireGuardManager {
         $this->client->updatePeer($id, $payload);
     }
 
+/**
+ * Normalizza un valore booleano in modo rigoroso.
+ * Accetta solo: true, false, "1", "0", "true", "false".
+ * Restituisce null per valori invalidi.
+ *
+ * @param mixed $value
+ * @return bool|null
+ */
+public static function parseBoolStrict($value): ?bool
+{
+    if (is_bool($value)) {
+        return $value;
+    }
+    $mapped = [
+        '1' => true, 'true' => true, 'on' => true,
+        '0' => false, 'false' => false, 'off' => false,
+    ];
+    return $mapped[strtolower($value ?? '')] ?? null;
+}
+
     /**
      * Regenerate key pair for an existing peer and update public-key on the CHR.
      * 
@@ -304,12 +324,128 @@ class WireGuardManager {
     }
 
     /**
+     * Find a peer by its name (case-insensitive).
+     * 
+     * @param string $name Peer name/comment.
+     * @return array|null Peer data as returned by getPeers(), or null if not found.
+     */
+    public function findPeerByName(string $name): ?array {
+        $peers = $this->getPeers();
+        foreach ($peers as $p) {
+            if (strcasecmp(($p['name'] ?? ''), $name) === 0) {
+                return $p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Regenerate the key pair of an existing peer looked up by name.
+     * The peer keeps its name and IP; only the key pair is replaced.
+     * 
+     * @param string $name Peer name/comment.
+     * @return array Same structure as addPeer(): name, ip, keys, config, script.
+     * @throws Exception if the peer name is not found.
+     */
+    public function regeneratePeer(string $name): array {
+        $peer = $this->findPeerByName($name);
+        if ($peer === null) {
+            throw new Exception("A peer with name '" . $name . "' was not found.");
+        }
+
+        $id = $peer['.id'] ?? null;
+        if (empty($id)) {
+            throw new Exception("A peer with name '" . $name . "' has no id.");
+        }
+
+        $keys = $this->regenerateKey($id);
+        $peerIp = explode('/', $peer['allowed-address'] ?? '')[0];
+        $serverPublicKey = $this->getServerPublicKey();
+        $comment = $this->config['comment'] ?? ($this->config['interface'] ?? '');
+        $interfaceName = $this->config['interface'] ?? 'wg-resnovae';
+
+        return [
+            '.id' => $id,
+            'name' => $peer['name'] ?? $name,
+            'ip' => $peerIp,
+            'public_key' => $keys['public_key'],
+            'private_key' => $keys['private_key'],
+            'config' => self::generateConfig(
+                $peerIp,
+                $keys['private_key'],
+                $serverPublicKey,
+                $this->config['endpoint'] ?? '',
+                $this->config['client_allowed_ips'] ?? ''
+            ),
+            'script' => self::generateRscScript(
+                $peerIp,
+                $keys['private_key'],
+                $serverPublicKey,
+                $this->config['endpoint'] ?? '',
+                $this->config['client_allowed_ips'] ?? '',
+                $interfaceName,
+                $comment,
+                $this->config['server_ip'] ?? '3.0.0.1',
+                $this->config['subnet'] ?? '3.0.0.0/21'
+            ),
+        ];
+    }
+
+    /**
      * Delete an existing peer.
      * 
      * @param string $id MikroTik rest ID (e.g. *1c).
      */
     public function deletePeer(string $id): void {
         $this->client->deletePeer($id);
+    }
+
+    /**
+     * Delete a peer looked up by name.
+     * 
+     * @param string $name Peer name/comment.
+     * @return array Deleted peer reference: name and ip.
+     * @throws Exception if the peer name is not found.
+     */
+    public function deletePeerByName(string $name): array {
+        $peer = $this->findPeerByName($name);
+        if ($peer === null) {
+            throw new Exception("A peer with name '" . $name . "' was not found.");
+        }
+        $id = $peer['.id'] ?? null;
+        if (empty($id)) {
+            throw new Exception("A peer with name '" . $name . "' has no id.");
+        }
+        $this->deletePeer($id);
+        return [
+            'name' => $peer['name'] ?? $name,
+            'ip' => explode('/', $peer['allowed-address'] ?? '')[0],
+        ];
+    }
+
+    /**
+     * Enable or disable a peer looked up by name.
+     * 
+     * @param string $name Peer name/comment.
+     * @param bool $disabled true to disable, false to enable.
+     * @return array Peer reference: name, ip and resulting disabled state.
+     * @throws Exception if the peer name is not found.
+     */
+    public function togglePeerByName(string $name, bool $disabled): array {
+        $peer = $this->findPeerByName($name);
+        if ($peer === null) {
+            throw new Exception("A peer with name '" . $name . "' was not found.");
+        }
+        $id = $peer['.id'] ?? null;
+        if (empty($id)) {
+            throw new Exception("A peer with name '" . $name . "' has no id.");
+        }
+        $this->togglePeer($id, $disabled);
+        return [
+            'name' => $peer['name'] ?? $name,
+            'ip' => explode('/', $peer['allowed-address'] ?? '')[0],
+            'disabled' => $disabled,
+        ];
     }
 
     /**

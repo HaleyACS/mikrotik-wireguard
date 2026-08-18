@@ -68,6 +68,17 @@ class ConfigManager
         return key($servers);
     }
 
+    public static function serverExists($key): bool
+    {
+        if (!is_string($key)) {
+            return false;
+        }
+        if (self::$availableServers === null) {
+            self::$availableServers = self::getAvailableServers();
+        }
+        return isset(self::$availableServers[$key]);
+    }
+
     public static function resolveConfig(): array
     {
         if (self::$activeConfig !== null) {

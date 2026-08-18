@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2026-08-18
+- **Added**: Public API endpoint `src/public-api.php` for machine-to-machine integration — creates a WireGuard peer via `POST ?action=create_peer` and returns IP, key pair, `.conf` and `.rsc`
+- **Added**: `check_peer` (GET) + `regenerate_peer` (POST) actions — name-existence check and key regeneration for an existing peer (same name/IP, new key pair) to support the "name already exists → ask to overwrite" flow
+- **Added**: `delete_peer` (POST) and `toggle_peer` (POST, `{name, disabled}`) actions — client removal and reversible suspension (enable/disable without touching keys)
+- **Added**: `WireGuardManager::findPeerByName()`, `regeneratePeer()`, `deletePeerByName()`, `togglePeerByName()` (case-insensitive lookup, same response shape as `addPeer()`)
+- **Security**: unknown `server` query param now returns HTTP `400` instead of silently falling back to the default config (`ConfigManager::serverExists()`)
+- **Added**: Bearer token authentication (`.api-token`, gitignored) with `getApiToken()`/`isApiTokenValid()`/`requireApiToken()` in `src/auth.php`
+- **Security**: `.htaccess.example` now includes a `<FilesMatch "^\.">` block to prevent direct download of `.api-token`/`.admin-hash`
+- **Docs**: "Public API" section in `README.md` (setup, actions table, request/response contract, curl examples for the create/overwrite flow)
+- **Tests**: `PublicApiAuthTest` (token loading/validation) + `findPeerByName`/`regeneratePeer`/`deletePeerByName`/`togglePeerByName`/`serverExists` coverage (134 → 157 tests)
+
 ## [2.2.2] - 2026-07-31
 - **Security**: CSP `script-src` now uses a per-request nonce — `'unsafe-inline'` removed; `AppConfig` inline block is nonce-tagged
 - **Changed**: all inline JS handlers removed — interactivity via `data-action` + event delegation

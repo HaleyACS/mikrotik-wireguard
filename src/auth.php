@@ -30,6 +30,57 @@ function isAuthEnabled(): bool
     return getAdminHash() !== null;
 }
 
+function getApiToken(): ?string
+{
+    $tokenFile = __DIR__ . '/../.api-token';
+    if (file_exists($tokenFile)) {
+        $token = trim(file_get_contents($tokenFile));
+        return $token !== '' ? $token : null;
+    }
+    return null;
+}
+
+function isApiTokenValid(?string $token): bool
+{
+    if ($token === null || $token === '') {
+        return false;
+    }
+    $expected = getApiToken();
+    if ($expected === null) {
+        return false;
+    }
+    return hash_equals($expected, $token);
+}
+
+function requireApiToken(): void
+{
+    if (!isApiTokenValid(getBearerToken())) {
+        header('Content-Type: application/json');
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+}
+
+function getBearerToken(): ?string
+{
+    $header = $_SERVER['HTTP_AUTHORIZATION']
+        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+        ?? '';
+    if ($header === '' && function_exists('getallheaders')) {
+        foreach (getallheaders() as $name => $value) {
+            if (strcasecmp($name, 'Authorization') === 0) {
+                $header = $value;
+                break;
+            }
+        }
+    }
+    if (preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
+        return trim($m[1]);
+    }
+    return null;
+}
+
 function isBruteForceLocked(): bool
 {
     startSession();

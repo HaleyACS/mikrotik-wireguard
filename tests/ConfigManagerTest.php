@@ -100,6 +100,21 @@ class ConfigManagerTest extends TestCase
         $this->assertEquals($sorted, $keys, 'Servers should be sorted alphabetically');
     }
 
+    public function testServerExistsValid(): void
+    {
+        $this->assertTrue(ConfigManager::serverExists('01-resnovae'));
+    }
+
+    public function testServerExistsUnknown(): void
+    {
+        $this->assertFalse(ConfigManager::serverExists('nonexistent'));
+    }
+
+    public function testServerExistsEmpty(): void
+    {
+        $this->assertFalse(ConfigManager::serverExists(''));
+    }
+
     public function testResnovaeConfigValid(): void
     {
         $config = require __DIR__ . '/../configs/01-resnovae.php';

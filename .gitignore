@@ -3,6 +3,7 @@ config.php
 configs/*.php
 .htaccess
 .admin-hash
+.api-token
 .history/
 
 # ── Project-specific docs ────────────────────────────────────
