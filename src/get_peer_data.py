@@ -248,14 +248,21 @@ def main():
                         print(json.dumps({"error": f"Missing required payload field: {field}"}))
                         sys.exit(1)
                 
-                # Add peer via librouteros
+                # Add peer via librouteros. Forward optional RouterOS
+                # client-export metadata when present so native API mode matches
+                # REST mode behavior.
                 peer_path = api.path('/interface/wireguard/peers')
-                new_peer_id = peer_path.add(
-                    interface=payload['interface'],
-                    **{'public-key': payload['public-key']},
-                    **{'allowed-address': payload['allowed-address']},
-                    name=payload['name']
-                )
+                peer_data = {
+                    'interface': payload['interface'],
+                    'public-key': payload['public-key'],
+                    'allowed-address': payload['allowed-address'],
+                    'name': payload['name'],
+                }
+                for optional_field in ('client-endpoint', 'client-dns'):
+                    if payload.get(optional_field):
+                        peer_data[optional_field] = payload[optional_field]
+
+                new_peer_id = peer_path.add(**peer_data)
                 
                 result = {
                     '.id': new_peer_id,

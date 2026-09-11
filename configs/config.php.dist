@@ -44,6 +44,8 @@ return [
 
     // Client Connection Template Settings
     'endpoint' => 'server.example.com:13231',
+    // If you have an internal DNS Server, add it. You may also add an external
+    'client_dns' => '192.168.1.1, 1.1.1.1',
     'client_allowed_ips' => '10.0.0.0/24,192.168.1.0/24',
 
     // DNAT Port Mapping (Winbox access behind WireGuard)

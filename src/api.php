@@ -103,7 +103,8 @@ try {
             $serverPubKey = $manager->getServerPublicKey();
             $confContent = WireGuardManager::generateConfig(
                 $peerIp, $keys['private_key'], $serverPubKey,
-                $config['endpoint'], $config['client_allowed_ips']
+                $config['endpoint'], $config['client_allowed_ips'],
+                $config['client_dns'] ?? ''
             );
             $scriptContent = WireGuardManager::generateRscScript(
                 $peerIp, $keys['private_key'], $serverPubKey,

@@ -204,6 +204,28 @@ class WireGuardManager {
             'name' => $name,
         ];
 
+        // RouterOS client-export metadata stored on the server-side peer.
+        // These fields are used by RouterOS "show-client-config" / QR export;
+        // they do not configure the server's own WireGuard endpoint or DNS.
+        $clientEndpoint = trim((string)($this->config['endpoint'] ?? ''));
+        if ($clientEndpoint !== '') {
+            $payload['client-endpoint'] = $clientEndpoint;
+        }
+
+        $clientDns = $this->config['client_dns'] ?? '';
+        if (is_array($clientDns)) {
+            $dnsServers = $clientDns;
+        } else {
+            $dnsServers = explode(',', (string)$clientDns);
+        }
+        $dnsServers = array_values(array_filter(
+            array_map(static fn($dns) => trim((string)$dns), $dnsServers),
+            static fn($dns) => $dns !== ''
+        ));
+        if ($dnsServers !== []) {
+            $payload['client-dns'] = implode(',', $dnsServers);
+        }
+
         $result = $this->client->addPeer($payload);
         $newPeerId = $result['.id'] ?? $this->resolvePeerId($clientKeys, $name);
 
@@ -222,7 +244,8 @@ class WireGuardManager {
                 $clientKeys['private_key'],
                 $serverPublicKey,
                 $this->config['endpoint'] ?? '',
-                $this->config['client_allowed_ips'] ?? ''
+                $this->config['client_allowed_ips'] ?? '',
+                $this->config['client_dns'] ?? ''
             ),
             'script' => self::generateRscScript(
                 $clientIp,
@@ -233,7 +256,8 @@ class WireGuardManager {
                 'wg-resnovae',
                 $comment,
                 $this->config['server_ip'] ?? '3.0.0.1',
-                $this->config['subnet'] ?? '3.0.0.0/21'
+                $this->config['subnet'] ?? '3.0.0.0/21',
+                $this->config['client_dns'] ?? ''
             ),
         ];
     }
@@ -375,7 +399,8 @@ public static function parseBoolStrict($value): ?bool
                 $keys['private_key'],
                 $serverPublicKey,
                 $this->config['endpoint'] ?? '',
-                $this->config['client_allowed_ips'] ?? ''
+                $this->config['client_allowed_ips'] ?? '',
+                $this->config['client_dns'] ?? ''
             ),
             'script' => self::generateRscScript(
                 $peerIp,
@@ -386,7 +411,8 @@ public static function parseBoolStrict($value): ?bool
                 $interfaceName,
                 $comment,
                 $this->config['server_ip'] ?? '3.0.0.1',
-                $this->config['subnet'] ?? '3.0.0.0/21'
+                $this->config['subnet'] ?? '3.0.0.0/21',
+                $this->config['client_dns'] ?? ''
             ),
         ];
     }
@@ -466,13 +492,15 @@ public static function parseBoolStrict($value): ?bool
         string $clientPrivateKey,
         string $serverPublicKey,
         string $serverEndpoint,
-        string $clientAllowedIps
+        string $clientAllowedIps,
+        string $clientDns = ''
     ): string {
+        $dnsLine = trim($clientDns) !== '' ? "DNS = $clientDns\n" : '';
         return <<<INI
 [Interface]
 PrivateKey = $clientPrivateKey
 Address = $clientIp/32
-
+{$dnsLine}
 [Peer]
 PublicKey = $serverPublicKey
 Endpoint = $serverEndpoint
@@ -515,16 +543,29 @@ INI;
         string $interfaceName = "wg-resnovae",
         ?string $comment = null,
         string $serverIp = '3.0.0.1',
-        string $subnet = '3.0.0.0/21'
+        string $subnet = '3.0.0.0/21',
+        string $clientDns = ''
     ): string {
-        $endpointParts = explode(':', $serverEndpoint);
-        $endpointHost = $endpointParts[0] ?? '';
-        $endpointPort = $endpointParts[1] ?? '13231';
+        // Parse host:port while also handling bracketed IPv6 endpoints.
+        $endpoint = parse_url('udp://' . trim($serverEndpoint));
+        $endpointHost = $endpoint['host'] ?? '';
+        $endpointPort = $endpoint['port'] ?? 13231;
+        if ($endpointHost === '') {
+            throw new InvalidArgumentException("Invalid WireGuard endpoint: '$serverEndpoint'");
+        }
+        $endpointHost = trim($endpointHost, '[]');
         $comment = $comment ?: $interfaceName;
 
         $subnetParts = explode('/', $subnet);
         $networkAddress = $subnetParts[0];
         $mask = $subnetParts[1] ?? '21';
+
+        // RouterOS DNS configuration is global, not a WireGuard peer property.
+        // Normalize a comma-separated list before writing it into the client script.
+        $dnsServers = array_values(array_filter(
+            array_map('trim', explode(',', $clientDns)),
+            static fn(string $dns): bool => $dns !== ''
+        ));
 
         return <<<RSC
 # --- MikroTik Client Setup Script ---
@@ -541,7 +582,6 @@ add interface="$interfaceName" public-key="$serverPublicKey" \\
 
 /ip address
 add address="$clientIp/$mask" network="$networkAddress" interface="$interfaceName"
-
 /ip firewall address-list
 add address=$serverIp list=MANAGEMENT
 RSC;
