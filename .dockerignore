@@ -1,0 +1,8 @@
+.git
+.gitignore
+.admin-hash
+.api-token
+configs/*.php
+!configs/config.php.dist
+*.tgz
+*.zip

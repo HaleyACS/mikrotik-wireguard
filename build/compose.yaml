@@ -1,0 +1,100 @@
+services:
+  mikrotik-wireguard:
+    image: ${MIKROTIK_WIREGUARD_IMAGE:-mikrotik-wireguard:local}
+    build:
+      context: ..
+      dockerfile: build/Dockerfile
+    restart: unless-stopped
+
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+
+    environment:
+      MIKROTIK_HOST: ${MIKROTIK_HOST:?Set MIKROTIK_HOST in build/.env}
+      MIKROTIK_USERNAME: ${MIKROTIK_USERNAME:?Set MIKROTIK_USERNAME in build/.env}
+      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD:?Set MIKROTIK_PASSWORD in build/.env}
+      MIKROTIK_API_MODE: ${MIKROTIK_API_MODE:-rest}
+      MIKROTIK_SSL_VERIFY: ${MIKROTIK_SSL_VERIFY:-false}
+      MIKROTIK_INTERFACE: ${MIKROTIK_INTERFACE:-wireguard}
+      WIREGUARD_SUBNET: ${WIREGUARD_SUBNET:?Set WIREGUARD_SUBNET in build/.env}
+      WIREGUARD_SERVER_IP: ${WIREGUARD_SERVER_IP:?Set WIREGUARD_SERVER_IP in build/.env}
+      CLIENT_ENDPOINT: ${CLIENT_ENDPOINT:?Set CLIENT_ENDPOINT in build/.env}
+      CLIENT_ALLOWED_IPS: ${CLIENT_ALLOWED_IPS:?Set CLIENT_ALLOWED_IPS in build/.env}
+      CLIENT_DNS: ${CLIENT_DNS:-}
+      MIKROTIK_LANG: ${MIKROTIK_LANG:-en}
+      EXPORT_MODE: ${EXPORT_MODE:-rsc}
+      REFRESH_INTERVAL: ${REFRESH_INTERVAL:-30}
+      HANDSHAKE_TIMEOUT: ${HANDSHAKE_TIMEOUT:-5}
+      PAGE_SIZE: ${PAGE_SIZE:-50}
+      SHOW_DNAT_COLUMN: ${SHOW_DNAT_COLUMN:-false}
+      SHOW_TRAFFIC_COLUMN: ${SHOW_TRAFFIC_COLUMN:-true}
+      DNAT_BASE: ${DNAT_BASE:-30000}
+      DNAT_MULTIPLIER: ${DNAT_MULTIPLIER:-1000}
+      MIKROTIK_NATIVE_PORT: ${MIKROTIK_NATIVE_PORT:-8728}
+      MIKROTIK_NATIVE_TLS: ${MIKROTIK_NATIVE_TLS:-false}
+
+    volumes:
+      - mikrotik-wireguard-data:/data
+
+    # Generate a local test configuration from environment variables. Credentials
+    # remain in the container environment rather than being written into the file.
+    command:
+      - sh
+      - -ec
+      - |
+        cat > /var/www/html/configs/main.php <<'PHP'
+        <?php
+        $$envBool = static function (string $$name, bool $$default = false): bool {
+            $$value = getenv($$name);
+            if ($$value === false || $$value === '') {
+                return $$default;
+            }
+            return filter_var($$value, FILTER_VALIDATE_BOOLEAN);
+        };
+
+        return [
+            'lang' => getenv('MIKROTIK_LANG') ?: 'en',
+            'api_mode' => getenv('MIKROTIK_API_MODE') ?: 'rest',
+            'host' => getenv('MIKROTIK_HOST') ?: '',
+            'username' => getenv('MIKROTIK_USERNAME') ?: '',
+            'password' => getenv('MIKROTIK_PASSWORD') ?: '',
+            'ssl_verify' => $$envBool('MIKROTIK_SSL_VERIFY', false),
+            'native_api' => [
+                'type' => 'python',
+                'port' => (int) (getenv('MIKROTIK_NATIVE_PORT') ?: 8728),
+                'tls' => $$envBool('MIKROTIK_NATIVE_TLS', false),
+                'python_script' => __DIR__ . '/../src/get_peer_data.py',
+            ],
+            'interface' => getenv('MIKROTIK_INTERFACE') ?: 'wireguard',
+            'subnet' => getenv('WIREGUARD_SUBNET') ?: '',
+            'server_ip' => getenv('WIREGUARD_SERVER_IP') ?: '',
+            'endpoint' => getenv('CLIENT_ENDPOINT') ?: '',
+            'client_allowed_ips' => getenv('CLIENT_ALLOWED_IPS') ?: '',
+            'client_dns' => getenv('CLIENT_DNS') ?: '',
+            'dnat_base' => (int) (getenv('DNAT_BASE') ?: 30000),
+            'dnat_multiplier' => (int) (getenv('DNAT_MULTIPLIER') ?: 1000),
+            'show_dnat_column' => $$envBool('SHOW_DNAT_COLUMN', false),
+            'show_traffic_column' => $$envBool('SHOW_TRAFFIC_COLUMN', true),
+            'export_mode' => getenv('EXPORT_MODE') ?: 'rsc',
+            'comment' => 'Docker Compose test router',
+            'refresh_interval' => (int) (getenv('REFRESH_INTERVAL') ?: 30),
+            'handshake_timeout' => (int) (getenv('HANDSHAKE_TIMEOUT') ?: 5),
+            'page_size' => (int) (getenv('PAGE_SIZE') ?: 50),
+        ];
+        PHP
+
+        php -l /var/www/html/configs/main.php
+        exec apache2-foreground
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          php -r '$$r=@file_get_contents("http://127.0.0.1:8080/assets/css/login.css"); exit($$r === false ? 1 : 0);'
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mikrotik-wireguard-data:
