@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mikrotik-wireguard.fullname" . }}
+  labels:
+    {{- include "mikrotik-wireguard.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "mikrotik-wireguard.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if and (not .Values.auth.existingSecret) (or .Values.auth.adminPasswordHash .Values.auth.apiToken) }}
+        checksum/auth: {{ include (print $.Template.BasePath "/auth-secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "mikrotik-wireguard.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "mikrotik-wireguard.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if or .Values.auth.existingSecret .Values.auth.adminPasswordHash .Values.auth.apiToken }}
+      initContainers:
+        - name: bootstrap-auth
+          image: busybox:1.37
+          command:
+            - sh
+            - -ec
+            - |
+              if [ -f /bootstrap/admin-hash ] && [ ! -s /data/.admin-hash ]; then
+                cp /bootstrap/admin-hash /data/.admin-hash
+              fi
+              if [ -f /bootstrap/api-token ] && [ ! -s /data/.api-token ]; then
+                cp /bootstrap/api-token /data/.api-token
+              fi
+              chmod 600 /data/.admin-hash /data/.api-token 2>/dev/null || true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: bootstrap-auth
+              mountPath: /bootstrap
+              readOnly: true
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- range $name, $server := .Values.config.servers }}
+            - name: {{ include "mikrotik-wireguard.credentialsUsernameEnv" $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required (printf "config.servers.%s.credentialsSecret.name is required" $name) (dig "credentialsSecret" "name" "" $server) | quote }}
+                  key: {{ default "username" (dig "credentialsSecret" "usernameKey" "username" $server) | quote }}
+            - name: {{ include "mikrotik-wireguard.credentialsPasswordEnv" $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required (printf "config.servers.%s.credentialsSecret.name is required" $name) (dig "credentialsSecret" "name" "" $server) | quote }}
+                  key: {{ default "password" (dig "credentialsSecret" "passwordKey" "password" $server) | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: router-config
+              mountPath: /var/www/html/configs
+              readOnly: true
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: router-config
+          configMap:
+            name: {{ include "mikrotik-wireguard.fullname" . }}-config
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ default (include "mikrotik-wireguard.fullname" .) .Values.persistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if or .Values.auth.existingSecret .Values.auth.adminPasswordHash .Values.auth.apiToken }}
+        - name: bootstrap-auth
+          secret:
+            secretName: {{ include "mikrotik-wireguard.authSecretName" . }}
+            optional: true
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

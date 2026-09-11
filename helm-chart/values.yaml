@@ -1,0 +1,139 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/your-org/mikrotik-wireguard
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 33
+  fsGroupChangePolicy: OnRootMismatch
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+# Disabled by default because the upstream project explicitly recommends LAN-only exposure.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mikrotik-wireguard.example.internal
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Optional bootstrap credentials for the dashboard itself.
+# adminPasswordHash must be a bcrypt hash, NOT a plaintext password.
+auth:
+  existingSecret: ""
+  adminPasswordHash: ""
+  apiToken: ""
+
+# Router settings are non-sensitive and are rendered to a ConfigMap.
+# RouterOS username/password are read at runtime from credentialsSecret.
+# The referenced Secret is NOT created by this chart.
+#
+# IMPORTANT: servers is intentionally empty by default. Older chart versions
+# shipped a live `main` server, which Helm merged with user-defined server maps
+# and could cause the application to select the unintended default config.
+#
+# The preferred keys below match the upstream PHP config names exactly
+# (snake_case). v0.3.x also accepts the old v0.2.x camelCase aliases.
+config:
+  servers: {}
+
+# Example:
+# config:
+#   servers:
+#     main:
+#       credentialsSecret:
+#         name: mikrotik-wireguard-credentials
+#         usernameKey: username
+#         passwordKey: password
+#       lang: en
+#       api_mode: rest
+#       host: 192.168.88.1
+#       ssl_verify: false
+#       native_api:
+#         port: 8728
+#         tls: false
+#       interface: wireguard1
+#       subnet: 10.0.0.0/24
+#       server_ip: 10.0.0.1
+#       endpoint: vpn.example.com:13231 # client endpoint; client_endpoint is accepted as an alias
+#       client_dns:                 # optional; string or list; emitted in generated .conf
+#         - "10.0.2.254"
+#         - "1.1.1.1"
+#       client_allowed_ips: "10.0.0.0/24"
+#       dnat_base: 30000
+#       dnat_multiplier: 1000
+#       show_dnat_column: false
+#       show_traffic_column: true
+#       export_mode: rsc
+#       comment: My VPN Server
+#       refresh_interval: 30
+#       handshake_timeout: 5
+#       page_size: 50
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /assets/css/login.css
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 20
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /assets/css/login.css
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+topologySpreadConstraints: []
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []

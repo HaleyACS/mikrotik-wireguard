@@ -1,0 +1,133 @@
+{{- if not .Values.config.servers }}
+{{- fail "config.servers must contain at least one server configuration" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mikrotik-wireguard.fullname" . }}-config
+  labels:
+    {{- include "mikrotik-wireguard.labels" . | nindent 4 }}
+data:
+{{- range $name, $server := .Values.config.servers }}
+  {{- if not $server }}
+  {{- fail (printf "config.servers.%s must be a non-empty map" $name) }}
+  {{- end }}
+
+  {{- /* Reject conflicting old/new aliases rather than silently picking one. */}}
+  {{- $aliases := list
+      (list "api_mode" "apiMode")
+      (list "ssl_verify" "sslVerify")
+      (list "native_api" "nativeApi")
+      (list "server_ip" "serverIp")
+      (list "endpoint" "client_endpoint")
+      (list "client_allowed_ips" "clientAllowedIps")
+      (list "client_dns" "clientDns")
+      (list "dnat_base" "dnatBase")
+      (list "dnat_multiplier" "dnatMultiplier")
+      (list "show_dnat_column" "showDnatColumn")
+      (list "show_traffic_column" "showTrafficColumn")
+      (list "export_mode" "exportMode")
+      (list "refresh_interval" "refreshInterval")
+      (list "handshake_timeout" "handshakeTimeout")
+      (list "page_size" "pageSize")
+  }}
+  {{- range $pair := $aliases }}
+    {{- $newKey := index $pair 0 }}
+    {{- $oldKey := index $pair 1 }}
+    {{- if and (hasKey $server $newKey) (hasKey $server $oldKey) }}
+      {{- if ne (toJson (index $server $newKey)) (toJson (index $server $oldKey)) }}
+        {{- fail (printf "config.servers.%s has conflicting values for %s and legacy alias %s; keep only one" $name $newKey $oldKey) }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- $apiMode := "rest" }}
+  {{- if hasKey $server "api_mode" }}{{- $apiMode = index $server "api_mode" }}{{- else if hasKey $server "apiMode" }}{{- $apiMode = index $server "apiMode" }}{{- end }}
+  {{- $sslVerify := false }}
+  {{- if hasKey $server "ssl_verify" }}{{- $sslVerify = index $server "ssl_verify" }}{{- else if hasKey $server "sslVerify" }}{{- $sslVerify = index $server "sslVerify" }}{{- end }}
+  {{- /* native_api is optional. Treat an absent or null value as an empty map so REST mode never dereferences nil. */}}
+  {{- $nativeApi := dict }}
+  {{- if and (hasKey $server "native_api") (kindIs "map" (index $server "native_api")) }}
+    {{- $nativeApi = index $server "native_api" }}
+  {{- else if and (hasKey $server "nativeApi") (kindIs "map" (index $server "nativeApi")) }}
+    {{- $nativeApi = index $server "nativeApi" }}
+  {{- end }}
+  {{- $nativePort := 8728 }}
+  {{- if hasKey $nativeApi "port" }}{{- $nativePort = index $nativeApi "port" }}{{- end }}
+  {{- $nativeTls := false }}
+  {{- if hasKey $nativeApi "tls" }}{{- $nativeTls = index $nativeApi "tls" }}{{- end }}
+  {{- $serverIp := "" }}
+  {{- if hasKey $server "server_ip" }}{{- $serverIp = index $server "server_ip" }}{{- else if hasKey $server "serverIp" }}{{- $serverIp = index $server "serverIp" }}{{- end }}
+  {{- $endpoint := "" }}
+  {{- if hasKey $server "endpoint" }}{{- $endpoint = index $server "endpoint" }}{{- else if hasKey $server "client_endpoint" }}{{- $endpoint = index $server "client_endpoint" }}{{- end }}
+  {{- $clientAllowedIps := "" }}
+  {{- if hasKey $server "client_allowed_ips" }}{{- $clientAllowedIps = index $server "client_allowed_ips" }}{{- else if hasKey $server "clientAllowedIps" }}{{- $clientAllowedIps = index $server "clientAllowedIps" }}{{- end }}
+  {{- $clientDnsRaw := "" }}
+  {{- if hasKey $server "client_dns" }}{{- $clientDnsRaw = index $server "client_dns" }}{{- else if hasKey $server "clientDns" }}{{- $clientDnsRaw = index $server "clientDns" }}{{- end }}
+  {{- $clientDns := "" }}
+  {{- if kindIs "slice" $clientDnsRaw }}
+    {{- $dnsEntries := list }}
+    {{- range $idx, $dns := $clientDnsRaw }}
+      {{- if not (kindIs "string" $dns) }}
+        {{- fail (printf "config.servers.%s.client_dns[%d] must be a string" $name $idx) }}
+      {{- end }}
+      {{- if eq (trim $dns) "" }}
+        {{- fail (printf "config.servers.%s.client_dns[%d] must not be empty" $name $idx) }}
+      {{- end }}
+      {{- $dnsEntries = append $dnsEntries (trim $dns) }}
+    {{- end }}
+    {{- $clientDns = join ", " $dnsEntries }}
+  {{- else if kindIs "string" $clientDnsRaw }}
+    {{- $clientDns = trim $clientDnsRaw }}
+  {{- else if not (empty $clientDnsRaw) }}
+    {{- fail (printf "config.servers.%s.client_dns must be a string or list of strings" $name) }}
+  {{- end }}
+  {{- $dnatBase := 30000 }}
+  {{- if hasKey $server "dnat_base" }}{{- $dnatBase = index $server "dnat_base" }}{{- else if hasKey $server "dnatBase" }}{{- $dnatBase = index $server "dnatBase" }}{{- end }}
+  {{- $dnatMultiplier := 1000 }}
+  {{- if hasKey $server "dnat_multiplier" }}{{- $dnatMultiplier = index $server "dnat_multiplier" }}{{- else if hasKey $server "dnatMultiplier" }}{{- $dnatMultiplier = index $server "dnatMultiplier" }}{{- end }}
+  {{- $showDnatColumn := false }}
+  {{- if hasKey $server "show_dnat_column" }}{{- $showDnatColumn = index $server "show_dnat_column" }}{{- else if hasKey $server "showDnatColumn" }}{{- $showDnatColumn = index $server "showDnatColumn" }}{{- end }}
+  {{- $showTrafficColumn := true }}
+  {{- if hasKey $server "show_traffic_column" }}{{- $showTrafficColumn = index $server "show_traffic_column" }}{{- else if hasKey $server "showTrafficColumn" }}{{- $showTrafficColumn = index $server "showTrafficColumn" }}{{- end }}
+  {{- $exportMode := "rsc" }}
+  {{- if hasKey $server "export_mode" }}{{- $exportMode = index $server "export_mode" }}{{- else if hasKey $server "exportMode" }}{{- $exportMode = index $server "exportMode" }}{{- end }}
+  {{- $refreshInterval := 30 }}
+  {{- if hasKey $server "refresh_interval" }}{{- $refreshInterval = index $server "refresh_interval" }}{{- else if hasKey $server "refreshInterval" }}{{- $refreshInterval = index $server "refreshInterval" }}{{- end }}
+  {{- $handshakeTimeout := 5 }}
+  {{- if hasKey $server "handshake_timeout" }}{{- $handshakeTimeout = index $server "handshake_timeout" }}{{- else if hasKey $server "handshakeTimeout" }}{{- $handshakeTimeout = index $server "handshakeTimeout" }}{{- end }}
+  {{- $pageSize := 50 }}
+  {{- if hasKey $server "page_size" }}{{- $pageSize = index $server "page_size" }}{{- else if hasKey $server "pageSize" }}{{- $pageSize = index $server "pageSize" }}{{- end }}
+
+  {{ printf "%s.php" $name | quote }}: |
+    <?php
+    return [
+      'lang' => {{ include "mikrotik-wireguard.phpString" (default "en" $server.lang) }},
+      'api_mode' => {{ include "mikrotik-wireguard.phpString" $apiMode }},
+      'host' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.host is required" $name) $server.host) }},
+      'username' => getenv({{ include "mikrotik-wireguard.phpString" (include "mikrotik-wireguard.credentialsUsernameEnv" $name) }}) ?: '',
+      'password' => getenv({{ include "mikrotik-wireguard.phpString" (include "mikrotik-wireguard.credentialsPasswordEnv" $name) }}) ?: '',
+      'ssl_verify' => {{ ternary "true" "false" $sslVerify }},
+      'native_api' => [
+        'type' => 'python',
+        'port' => {{ $nativePort }},
+        'tls' => {{ ternary "true" "false" $nativeTls }},
+        'python_script' => __DIR__ . '/../src/get_peer_data.py',
+      ],
+      'interface' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.interface is required" $name) $server.interface) }},
+      'subnet' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.subnet is required" $name) $server.subnet) }},
+      'server_ip' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.server_ip (or legacy serverIp) is required" $name) $serverIp) }},
+      'endpoint' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.endpoint (or client_endpoint alias) is required" $name) $endpoint) }},
+      'client_allowed_ips' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.client_allowed_ips (or legacy clientAllowedIps) is required" $name) $clientAllowedIps) }},
+      'client_dns' => {{ include "mikrotik-wireguard.phpString" $clientDns }},
+      'dnat_base' => {{ $dnatBase }},
+      'dnat_multiplier' => {{ $dnatMultiplier }},
+      'show_dnat_column' => {{ ternary "true" "false" $showDnatColumn }},
+      'show_traffic_column' => {{ ternary "true" "false" $showTrafficColumn }},
+      'export_mode' => {{ include "mikrotik-wireguard.phpString" $exportMode }},
+      'comment' => {{ include "mikrotik-wireguard.phpString" (default $name $server.comment) }},
+      'refresh_interval' => {{ $refreshInterval }},
+      'handshake_timeout' => {{ $handshakeTimeout }},
+      'page_size' => {{ $pageSize }},
+    ];
+{{- end }}

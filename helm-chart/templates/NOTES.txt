@@ -1,0 +1,13 @@
+1. Check the deployment:
+   kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+2. RouterOS credentials are read from these existing Kubernetes Secrets:
+{{- range $name, $server := .Values.config.servers }}
+   - {{ $name }}: {{ required (printf "config.servers.%s.credentialsSecret.name is required" $name) (dig "credentialsSecret" "name" "" $server) }}
+{{- end }}
+
+3. For local/LAN access without an Ingress:
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "mikrotik-wireguard.fullname" . }} 8080:{{ .Values.service.port }}
+   Then open http://127.0.0.1:8080/setup.php
+
+4. The first setup stores the dashboard admin bcrypt hash on the data volume.

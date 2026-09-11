@@ -1,0 +1,9 @@
+apiVersion: v2
+name: mikrotik-wireguard
+description: Deploy rollopack/mikrotik-wireguard on Kubernetes
+home: https://github.com/rollopack/mikrotik-wireguard
+sources:
+  - https://github.com/rollopack/mikrotik-wireguard
+type: application
+version: 0.4.3
+appVersion: "main"

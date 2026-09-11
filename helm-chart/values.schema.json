@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "config": {
+      "type": "object",
+      "properties": {
+        "servers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "credentialsSecret",
+              "host",
+              "interface",
+              "subnet"
+            ],
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "server_ip"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "serverIp"
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "client_allowed_ips"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "clientAllowedIps"
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "endpoint"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "client_endpoint"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "properties": {
+              "credentialsSecret": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "usernameKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "passwordKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "lang": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "it"
+                ]
+              },
+              "api_mode": {
+                "type": "string",
+                "enum": [
+                  "rest",
+                  "native"
+                ]
+              },
+              "apiMode": {
+                "type": "string",
+                "enum": [
+                  "rest",
+                  "native"
+                ]
+              },
+              "host": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ssl_verify": {
+                "type": "boolean"
+              },
+              "sslVerify": {
+                "type": "boolean"
+              },
+              "native_api": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/nativeApi"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "nativeApi": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/nativeApi"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "interface": {
+                "type": "string",
+                "minLength": 1
+              },
+              "subnet": {
+                "type": "string",
+                "minLength": 1
+              },
+              "server_ip": {
+                "type": "string",
+                "minLength": 1
+              },
+              "serverIp": {
+                "type": "string",
+                "minLength": 1
+              },
+              "endpoint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "client_allowed_ips": {
+                "type": "string",
+                "minLength": 1
+              },
+              "clientAllowedIps": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dnat_base": {
+                "type": "integer"
+              },
+              "dnatBase": {
+                "type": "integer"
+              },
+              "dnat_multiplier": {
+                "type": "integer"
+              },
+              "dnatMultiplier": {
+                "type": "integer"
+              },
+              "show_dnat_column": {
+                "type": "boolean"
+              },
+              "showDnatColumn": {
+                "type": "boolean"
+              },
+              "show_traffic_column": {
+                "type": "boolean"
+              },
+              "showTrafficColumn": {
+                "type": "boolean"
+              },
+              "export_mode": {
+                "type": "string",
+                "enum": [
+                  "conf",
+                  "rsc"
+                ]
+              },
+              "exportMode": {
+                "type": "string",
+                "enum": [
+                  "conf",
+                  "rsc"
+                ]
+              },
+              "comment": {
+                "type": "string"
+              },
+              "refresh_interval": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "refreshInterval": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "handshake_timeout": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "handshakeTimeout": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "page_size": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "client_dns": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                ]
+              },
+              "clientDns": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                ]
+              },
+              "client_endpoint": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "nativeApi": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "integer",
+          "enum": [
+            8728,
+            8729
+          ]
+        },
+        "tls": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
