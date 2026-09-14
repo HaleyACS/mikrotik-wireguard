@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.4.0] - 2026-09-14
+- **Added**: Docker image and Docker Compose deployment support with persistent authentication/session storage.
+- **Added**: Helm chart for Kubernetes deployment with multiple RouterOS servers, Kubernetes Secrets, persistence, Ingress and TLS configuration.
+- **Added**: `client_dns` support for generated WireGuard `.conf` and MikroTik `.rsc` client configurations.
+- **Added**: Conditional RouterOS client export metadata (`client-address`, `client-endpoint`, `client-dns`) for QR/client configuration generation. Enabled by default and requires RouterOS 7.21+ on the server CHR; set `client_export_metadata` to `false` for older RouterOS versions.
+- **Fixed**: RouterOS client endpoint metadata no longer duplicates the WireGuard port in generated client configurations.
+- **Security**: Docker and Compose deployment files exclude `build/.env` from Git and image build contexts.
+- **Tests**: Added coverage for DNS exports, RouterOS client metadata, legacy metadata opt-out, IPv6 endpoints and configuration validation.
+- **Contributor**: Jorg Mertin (`@HaleyACS`) contributed the Docker, Compose, Helm, DNS and RouterOS client export changes.
+
 ## [2.3.0] - 2026-08-18
 - **Added**: Public API endpoint `src/public-api.php` for machine-to-machine integration — creates a WireGuard peer via `POST ?action=create_peer` and returns IP, key pair, `.conf` and `.rsc`
 - **Added**: `check_peer` (GET) + `regenerate_peer` (POST) actions — name-existence check and key regeneration for an existing peer (same name/IP, new key pair) to support the "name already exists → ask to overwrite" flow

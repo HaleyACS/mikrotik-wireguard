@@ -241,6 +241,12 @@
                   }
                 ]
               },
+              "client_export_metadata": {
+                "type": "boolean"
+              },
+              "clientExportMetadata": {
+                "type": "boolean"
+              },
               "clientDns": {
                 "oneOf": [
                   {

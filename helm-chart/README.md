@@ -52,7 +52,7 @@ config:
       credentialsSecret:
         name: mikrotik-wireguard-credentials
 
-      host: "10.0.0.0.254"
+      host: "10.0.0.254"
       api_mode: "rest"
       ssl_verify: false
 
@@ -63,23 +63,25 @@ config:
       endpoint: "vpn.example.com:51820"
 
       client_dns:
-        - "10.0.0.0.254"
+        - "10.0.0.254"
         - "1.1.1.1"
 
-      client_allowed_ips: "10.0.1.0/24, 10.0.0.0.0/24"
+      client_allowed_ips: "10.0.1.0/24, 10.0.0.0/24"
 ```
 
 `client_dns` supports either a YAML list or a comma-separated string.
+
+`client_export_metadata` defaults to `true` and requires RouterOS 7.21 or newer on the server CHR. Set it to `false` for older RouterOS versions; generated `.conf` and `.rsc` files remain available.
 
 A generated WireGuard client configuration can therefore contain:
 
 ```ini
 [Interface]
-DNS = 10.0.0.0.254, 1.1.1.1
+DNS = 10.0.0.254, 1.1.1.1
 
 [Peer]
 Endpoint = vpn.example.com:51820
-AllowedIPs = 10.0.1.0/24, 10.0.0.0.0/24
+AllowedIPs = 10.0.1.0/24, 10.0.0.0/24
 ```
 
 ## Install
@@ -167,7 +169,7 @@ ingress:
 
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0.0/24,10.0.1.0/24"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/24,10.0.1.0/24"
 
   hosts:
     - host: wireguard-ui.example.com

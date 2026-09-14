@@ -21,6 +21,7 @@ services:
       CLIENT_ENDPOINT: ${CLIENT_ENDPOINT:?Set CLIENT_ENDPOINT in build/.env}
       CLIENT_ALLOWED_IPS: ${CLIENT_ALLOWED_IPS:?Set CLIENT_ALLOWED_IPS in build/.env}
       CLIENT_DNS: ${CLIENT_DNS:-}
+      CLIENT_EXPORT_METADATA: ${CLIENT_EXPORT_METADATA:-true}
       MIKROTIK_LANG: ${MIKROTIK_LANG:-en}
       EXPORT_MODE: ${EXPORT_MODE:-rsc}
       REFRESH_INTERVAL: ${REFRESH_INTERVAL:-30}
@@ -71,6 +72,7 @@ services:
             'endpoint' => getenv('CLIENT_ENDPOINT') ?: '',
             'client_allowed_ips' => getenv('CLIENT_ALLOWED_IPS') ?: '',
             'client_dns' => getenv('CLIENT_DNS') ?: '',
+            'client_export_metadata' => $$envBool('CLIENT_EXPORT_METADATA', true),
             'dnat_base' => (int) (getenv('DNAT_BASE') ?: 30000),
             'dnat_multiplier' => (int) (getenv('DNAT_MULTIPLIER') ?: 1000),
             'show_dnat_column' => $$envBool('SHOW_DNAT_COLUMN', false),

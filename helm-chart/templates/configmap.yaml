@@ -22,6 +22,7 @@ data:
       (list "endpoint" "client_endpoint")
       (list "client_allowed_ips" "clientAllowedIps")
       (list "client_dns" "clientDns")
+      (list "client_export_metadata" "clientExportMetadata")
       (list "dnat_base" "dnatBase")
       (list "dnat_multiplier" "dnatMultiplier")
       (list "show_dnat_column" "showDnatColumn")
@@ -82,6 +83,8 @@ data:
   {{- else if not (empty $clientDnsRaw) }}
     {{- fail (printf "config.servers.%s.client_dns must be a string or list of strings" $name) }}
   {{- end }}
+  {{- $clientExportMetadata := true }}
+  {{- if hasKey $server "client_export_metadata" }}{{- $clientExportMetadata = index $server "client_export_metadata" }}{{- else if hasKey $server "clientExportMetadata" }}{{- $clientExportMetadata = index $server "clientExportMetadata" }}{{- end }}
   {{- $dnatBase := 30000 }}
   {{- if hasKey $server "dnat_base" }}{{- $dnatBase = index $server "dnat_base" }}{{- else if hasKey $server "dnatBase" }}{{- $dnatBase = index $server "dnatBase" }}{{- end }}
   {{- $dnatMultiplier := 1000 }}
@@ -120,6 +123,7 @@ data:
       'endpoint' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.endpoint (or client_endpoint alias) is required" $name) $endpoint) }},
       'client_allowed_ips' => {{ include "mikrotik-wireguard.phpString" (required (printf "config.servers.%s.client_allowed_ips (or legacy clientAllowedIps) is required" $name) $clientAllowedIps) }},
       'client_dns' => {{ include "mikrotik-wireguard.phpString" $clientDns }},
+      'client_export_metadata' => {{ ternary "true" "false" $clientExportMetadata }},
       'dnat_base' => {{ $dnatBase }},
       'dnat_multiplier' => {{ $dnatMultiplier }},
       'show_dnat_column' => {{ ternary "true" "false" $showDnatColumn }},

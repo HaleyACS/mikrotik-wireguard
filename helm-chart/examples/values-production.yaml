@@ -19,6 +19,7 @@ config:
       client_dns:
         - "1.1.1.1"
         - "1.0.0.1"
+      client_export_metadata: true
 
 persistence:
   enabled: true

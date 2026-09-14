@@ -204,26 +204,19 @@ class WireGuardManager {
             'name' => $name,
         ];
 
-        // RouterOS client-export metadata stored on the server-side peer.
-        // These fields are used by RouterOS "show-client-config" / QR export;
-        // they do not configure the server's own WireGuard endpoint or DNS.
-        $clientEndpoint = trim((string)($this->config['endpoint'] ?? ''));
-        if ($clientEndpoint !== '') {
-            $payload['client-endpoint'] = $clientEndpoint;
-        }
+        if ($this->config['client_export_metadata'] ?? true) {
+            // These fields enable RouterOS "show-client-config" / QR export.
+            // Older CHRs can disable them because the properties are unavailable.
+            $clientEndpoint = trim((string)($this->config['endpoint'] ?? ''));
+            if ($clientEndpoint !== '') {
+                $payload['client-endpoint'] = self::extractEndpointHost($clientEndpoint);
+            }
 
-        $clientDns = $this->config['client_dns'] ?? '';
-        if (is_array($clientDns)) {
-            $dnsServers = $clientDns;
-        } else {
-            $dnsServers = explode(',', (string)$clientDns);
-        }
-        $dnsServers = array_values(array_filter(
-            array_map(static fn($dns) => trim((string)$dns), $dnsServers),
-            static fn($dns) => $dns !== ''
-        ));
-        if ($dnsServers !== []) {
-            $payload['client-dns'] = implode(',', $dnsServers);
+            $clientDns = self::normalizeClientDns($this->config['client_dns'] ?? '');
+            if ($clientDns !== '') {
+                $payload['client-dns'] = $clientDns;
+            }
+            $payload['client-address'] = $clientIp . '/32';
         }
 
         $result = $this->client->addPeer($payload);
@@ -493,9 +486,10 @@ public static function parseBoolStrict($value): ?bool
         string $serverPublicKey,
         string $serverEndpoint,
         string $clientAllowedIps,
-        string $clientDns = ''
+        string|array $clientDns = ''
     ): string {
-        $dnsLine = trim($clientDns) !== '' ? "DNS = $clientDns\n" : '';
+        $normalizedDns = self::normalizeClientDns($clientDns);
+        $dnsLine = $normalizedDns !== '' ? "DNS = $normalizedDns\n" : '';
         return <<<INI
 [Interface]
 PrivateKey = $clientPrivateKey
@@ -544,7 +538,7 @@ INI;
         ?string $comment = null,
         string $serverIp = '3.0.0.1',
         string $subnet = '3.0.0.0/21',
-        string $clientDns = ''
+        string|array $clientDns = ''
     ): string {
         // Parse host:port while also handling bracketed IPv6 endpoints.
         $endpoint = parse_url('udp://' . trim($serverEndpoint));
@@ -561,11 +555,8 @@ INI;
         $mask = $subnetParts[1] ?? '21';
 
         // RouterOS DNS configuration is global, not a WireGuard peer property.
-        // Normalize a comma-separated list before writing it into the client script.
-        $dnsServers = array_values(array_filter(
-            array_map('trim', explode(',', $clientDns)),
-            static fn(string $dns): bool => $dns !== ''
-        ));
+        $normalizedDns = self::normalizeClientDns($clientDns);
+        $dnsLine = $normalizedDns !== '' ? "/ip dns set servers=\"$normalizedDns\"\n" : '';
 
         return <<<RSC
 # --- MikroTik Client Setup Script ---
@@ -582,8 +573,38 @@ add interface="$interfaceName" public-key="$serverPublicKey" \\
 
 /ip address
 add address="$clientIp/$mask" network="$networkAddress" interface="$interfaceName"
+$dnsLine
 /ip firewall address-list
 add address=$serverIp list=MANAGEMENT
 RSC;
+    }
+
+    /**
+     * Normalize a configured DNS value for RouterOS and WireGuard exports.
+     *
+     * @param string|array $clientDns Comma-separated string or list of DNS servers.
+     */
+    private static function normalizeClientDns(string|array $clientDns): string
+    {
+        $values = is_array($clientDns) ? $clientDns : explode(',', $clientDns);
+        $values = array_map(static fn($dns): string => trim((string)$dns), $values);
+        $values = array_values(array_filter($values, static fn(string $dns): bool => $dns !== ''));
+
+        return implode(', ', $values);
+    }
+
+    /**
+     * RouterOS appends the WireGuard listen port when generating client config
+     * from client-endpoint, so store only the host in that metadata field.
+     */
+    private static function extractEndpointHost(string $endpoint): string
+    {
+        $parsed = parse_url('udp://' . trim($endpoint));
+        $host = $parsed['host'] ?? '';
+        if ($host === '') {
+            throw new InvalidArgumentException("Invalid WireGuard endpoint: '$endpoint'");
+        }
+
+        return trim($host, '[]');
     }
 }

@@ -18,6 +18,19 @@ class ConfigValidatorTest extends TestCase {
         $this->assertTrue(true);
     }
 
+    public function testClientExportMetadataBooleanPasses() {
+        $config = $this->validConfig;
+        $config['client_export_metadata'] = false;
+        ConfigValidator::validate($config);
+        $this->assertTrue(true);
+    }
+
+    public function testClientExportMetadataMustBeBoolean() {
+        $config = $this->validConfig;
+        $config['client_export_metadata'] = 'false';
+        $this->expectValidationException('client_export_metadata must be a boolean', $config);
+    }
+
     public function testMissingSubnet() {
         $config = $this->validConfig;
         unset($config['subnet']);

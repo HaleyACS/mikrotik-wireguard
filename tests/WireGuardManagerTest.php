@@ -96,6 +96,37 @@ class WireGuardManagerTest extends TestCase {
         $this->assertTrue(str_contains($config, 'PersistentKeepalive = 25'), 'Config should contain persistent keepalive');
     }
 
+    public function testConfigFormattingIncludesDns() {
+        $config = WireGuardManager::generateConfig(
+            '3.0.0.5',
+            'client_private_key',
+            'server_public_key',
+            'vpn.example.com:13231',
+            '3.0.0.0/24',
+            ['1.1.1.1', ' 1.0.0.1 ']
+        );
+
+        $this->assertTrue(str_contains($config, 'DNS = 1.1.1.1, 1.0.0.1'), 'Config should contain normalized DNS servers');
+    }
+
+    public function testRscFormattingIncludesDnsAndParsesEndpoint() {
+        $script = WireGuardManager::generateRscScript(
+            '3.0.0.5',
+            'client_private_key',
+            'server_public_key',
+            '[2001:db8::1]:13231',
+            '0.0.0.0/0',
+            'wireguard1',
+            'test-client',
+            '3.0.0.1',
+            '3.0.0.0/24',
+            '1.1.1.1, 1.0.0.1'
+        );
+
+        $this->assertTrue(str_contains($script, 'endpoint-address="2001:db8::1" endpoint-port=13231'), 'RSC should parse bracketed IPv6 endpoints');
+        $this->assertTrue(str_contains($script, '/ip dns set servers="1.1.1.1, 1.0.0.1"'), 'RSC should configure client DNS');
+    }
+
     public function testGetPeers() {
         $mockClient = new MockMikrotikRestClient();
         $mockClient->setResponse('GET', '/interface/wireguard/peers', [
@@ -169,6 +200,73 @@ class WireGuardManagerTest extends TestCase {
         $this->assertEquals('WireGuard-ResNovae', $putRequest['data']['interface']);
         $this->assertEquals('3.0.0.2/32', $putRequest['data']['allowed-address']);
         $this->assertEquals('Test-Client-New', $putRequest['data']['name']);
+    }
+
+    public function testAddPeerIncludesRouterOsClientExportMetadata() {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+        $mockClient->setResponse('GET', '/interface/wireguard', [
+            ['name' => 'WireGuard-ResNovae', 'public-key' => 'SERVER_PUBLIC_KEY']
+        ]);
+        $mockClient->setResponse('PUT', '/interface/wireguard/peers', ['.id' => '*1d']);
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+
+        $manager = new WireGuardManager($mockClient, [
+            'interface' => 'WireGuard-ResNovae',
+            'subnet' => '3.0.0.0/24',
+            'server_ip' => '3.0.0.1',
+            'endpoint' => 'vpn.example.com:13231',
+            'client_allowed_ips' => '3.0.0.0/24',
+            'client_dns' => ['1.1.1.1', '1.0.0.1'],
+        ]);
+
+        $manager->addPeer('Test-Client-Metadata');
+
+        $putRequest = null;
+        foreach ($mockClient->history as $request) {
+            if ($request['method'] === 'PUT') {
+                $putRequest = $request;
+                break;
+            }
+        }
+
+        $this->assertEquals('3.0.0.2/32', $putRequest['data']['client-address']);
+        $this->assertEquals('vpn.example.com', $putRequest['data']['client-endpoint']);
+        $this->assertEquals('1.1.1.1, 1.0.0.1', $putRequest['data']['client-dns']);
+    }
+
+    public function testAddPeerCanDisableRouterOsClientExportMetadata() {
+        $mockClient = new MockMikrotikRestClient();
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+        $mockClient->setResponse('GET', '/interface/wireguard', [
+            ['name' => 'WireGuard-ResNovae', 'public-key' => 'SERVER_PUBLIC_KEY']
+        ]);
+        $mockClient->setResponse('PUT', '/interface/wireguard/peers', ['.id' => '*1d']);
+        $mockClient->setResponse('GET', '/interface/wireguard/peers', []);
+
+        $manager = new WireGuardManager($mockClient, [
+            'interface' => 'WireGuard-ResNovae',
+            'subnet' => '3.0.0.0/24',
+            'server_ip' => '3.0.0.1',
+            'endpoint' => 'vpn.example.com:13231',
+            'client_allowed_ips' => '3.0.0.0/24',
+            'client_dns' => '1.1.1.1',
+            'client_export_metadata' => false,
+        ]);
+
+        $manager->addPeer('Test-Client-Legacy');
+
+        $putRequest = null;
+        foreach ($mockClient->history as $request) {
+            if ($request['method'] === 'PUT') {
+                $putRequest = $request;
+                break;
+            }
+        }
+
+        $this->assertFalse(array_key_exists('client-address', $putRequest['data']));
+        $this->assertFalse(array_key_exists('client-endpoint', $putRequest['data']));
+        $this->assertFalse(array_key_exists('client-dns', $putRequest['data']));
     }
 
     public function testAddPeerWithCollision() {

@@ -112,7 +112,8 @@ try {
                 $config['interface'],
                 $config['comment'] ?? $config['interface'],
                 $config['server_ip'],
-                $config['subnet']
+                $config['subnet'],
+                $config['client_dns'] ?? ''
             );
         }
 

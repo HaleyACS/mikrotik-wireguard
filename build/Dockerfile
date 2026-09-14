@@ -20,7 +20,6 @@ ENV PATH="/opt/librouteros-venv/bin:${PATH}"
 COPY . /var/www/html/
 COPY build/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY build/php.ini /usr/local/etc/php/conf.d/mikrotik-wireguard.ini
-COPY build/config.php /var/www/html/config.php
 COPY build/entrypoint.sh /usr/local/bin/mikrotik-wireguard-entrypoint
 
 RUN set -eux; \

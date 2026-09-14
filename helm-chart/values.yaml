@@ -92,6 +92,7 @@ config:
 #       client_dns:                 # optional; string or list; emitted in generated .conf
 #         - "10.0.2.254"
 #         - "1.1.1.1"
+#       client_export_metadata: true # requires RouterOS 7.21+ on the server CHR
 #       client_allowed_ips: "10.0.0.0/24"
 #       dnat_base: 30000
 #       dnat_multiplier: 1000

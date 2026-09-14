@@ -4,6 +4,7 @@ configs/*.php
 .htaccess
 .admin-hash
 .api-token
+build/.env
 .history/
 
 # ── Project-specific docs ────────────────────────────────────

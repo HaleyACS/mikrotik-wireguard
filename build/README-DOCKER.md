@@ -12,7 +12,7 @@ The Docker-related files live in the `build/` directory:
 build/
 ├── Dockerfile
 ├── compose.yaml
-├── .env.example
+├── env.example
 └── README-DOCKER.md
 ```
 
@@ -40,7 +40,7 @@ Additional permissions may be required depending on the operations performed by 
 Copy the example environment file:
 
 ```bash
-cp build/.env.example build/.env
+cp build/env.example build/.env
 ```
 
 Edit it:
@@ -204,6 +204,10 @@ The generated client configuration will contain:
 ```ini
 DNS = 10.0.2.254, 1.1.1.1
 ```
+
+`CLIENT_EXPORT_METADATA`
+
+Controls RouterOS client export metadata used by QR/client configuration generation. It defaults to `true` and requires RouterOS 7.21 or newer on the server CHR. Set it to `false` for older RouterOS versions.
 
 ## Build and start
 

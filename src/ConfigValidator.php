@@ -23,6 +23,7 @@ class ConfigValidator {
         self::validateShowDnatColumn($config);
         self::validateShowTrafficColumn($config);
         self::validateExportMode($config);
+        self::validateClientExportMetadata($config);
     }
 
     private static function validateNativeApiConfig(array $config): void {
@@ -187,6 +188,12 @@ class ConfigValidator {
     private static function validateShowTrafficColumn(array $config): void {
         if (isset($config['show_traffic_column']) && !is_bool($config['show_traffic_column'])) {
             throw new InvalidArgumentException("show_traffic_column must be a boolean (true or false)");
+        }
+    }
+
+    private static function validateClientExportMetadata(array $config): void {
+        if (isset($config['client_export_metadata']) && !is_bool($config['client_export_metadata'])) {
+            throw new InvalidArgumentException("client_export_metadata must be a boolean (true or false)");
         }
     }
 

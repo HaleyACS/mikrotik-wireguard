@@ -44,6 +44,9 @@ return [
 
     // Client Connection Template Settings
     'endpoint' => 'server.example.com:13231',
+    // Enable RouterOS client export metadata for QR/config generation.
+    // Requires RouterOS 7.21+ on the server CHR; set false for older versions.
+    'client_export_metadata' => true,
     // If you have an internal DNS Server, add it. You may also add an external
     'client_dns' => '192.168.1.1, 1.1.1.1',
     'client_allowed_ips' => '10.0.0.0/24,192.168.1.0/24',

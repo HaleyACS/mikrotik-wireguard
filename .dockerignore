@@ -2,6 +2,7 @@
 .gitignore
 .admin-hash
 .api-token
+build/.env
 configs/*.php
 !configs/config.php.dist
 *.tgz
