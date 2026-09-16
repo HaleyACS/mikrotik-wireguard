@@ -248,10 +248,11 @@ try {
                             <div class="peer-ip-badge" id="resIp" style="font-size: 1rem; padding: 0.35rem 0.75rem;">-</div>
                         </div>
 
-                        <div class="tab-buttons">
-                            <button type="button" class="tab-btn active" data-action="add-tab" data-tab="conf"><?php echo t($lang, 'modal.add.tab_conf'); ?></button>
-                            <button type="button" class="tab-btn" data-action="add-tab" data-tab="script"><?php echo t($lang, 'modal.add.tab_script'); ?></button>
-                        </div>
+                            <div class="tab-buttons">
+                                <button type="button" class="tab-btn active" data-action="add-tab" data-tab="conf"><?php echo t($lang, 'modal.add.tab_conf'); ?></button>
+                                <button type="button" class="tab-btn" data-action="add-tab" data-tab="script"><?php echo t($lang, 'modal.add.tab_script'); ?></button>
+                                <button type="button" class="tab-btn" id="addQrTab" data-action="add-tab" data-tab="qrcode" disabled><?php echo t($lang, 'modal.add.tab_qrcode'); ?></button>
+                            </div>
 
                         <div id="tab-conf" class="tab-content active">
                             <div class="code-box">
@@ -275,6 +276,13 @@ try {
                             <button type="button" class="btn btn-secondary btn-sm" id="btnDownloadScript" style="width: 100%;">
                                 <?php echo t($lang, 'modal.add.download_script'); ?>
                             </button>
+                        </div>
+
+                        <div id="tab-qrcode" class="tab-content">
+                            <div class="qr-code-panel">
+                                <div id="addQrCode" class="qr-code-frame" role="status"></div>
+                                <p><?php echo t($lang, 'modal.qrcode.description'); ?></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -387,6 +395,7 @@ try {
                     <div class="tab-buttons">
                         <button type="button" class="tab-btn" id="tabBtnExportConf" data-action="export-tab" data-tab="conf"><?php echo t($lang, 'modal.export.tab_conf'); ?></button>
                         <button type="button" class="tab-btn" id="tabBtnExportScript" data-action="export-tab" data-tab="script"><?php echo t($lang, 'modal.export.tab_script'); ?></button>
+                        <button type="button" class="tab-btn" id="tabBtnExportQr" data-action="export-tab" data-tab="qrcode" disabled><?php echo t($lang, 'modal.export.tab_qrcode'); ?></button>
                     </div>
 
                     <div id="tab-export-conf" class="tab-content">
@@ -411,6 +420,13 @@ try {
                         <button type="button" class="btn btn-secondary btn-sm" id="btnDownloadExportScript" style="width: 100%;">
                             <?php echo t($lang, 'modal.export.download_script'); ?>
                         </button>
+                    </div>
+
+                    <div id="tab-export-qrcode" class="tab-content">
+                        <div class="qr-code-panel">
+                            <div id="exportQrCode" class="qr-code-frame" role="status"></div>
+                            <p><?php echo t($lang, 'modal.qrcode.description'); ?></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -491,6 +507,7 @@ try {
             showTrafficColumn: <?php echo json_encode($config['show_traffic_column'] ?? true); ?>,
         };
     </script>
+    <script src="assets/js/qrcode-generator.min.js"></script>
     <script src="assets/js/app.js"></script>
 </body>
 </html>

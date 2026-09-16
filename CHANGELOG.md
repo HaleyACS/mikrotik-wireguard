@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.0] - 2026-09-16
+- **Added**: QR Code tab in the peer creation and client export modals for scanning WireGuard configurations with mobile apps.
+- **Added**: Local QR generation from the complete `.conf` content, with responsive layout and accessibility labels.
+- **Added**: English and Italian translations for the QR Code interface.
+- **Security**: QR data is generated in the browser, cleared when modals close, and never sent to a third-party service.
+- **Tests**: Added dashboard QR asset and modal integration coverage.
+
 ## [2.4.0] - 2026-09-14
 - **Added**: Docker image and Docker Compose deployment support with persistent authentication/session storage.
 - **Added**: Helm chart for Kubernetes deployment with multiple RouterOS servers, Kubernetes Secrets, persistence, Ingress and TLS configuration.

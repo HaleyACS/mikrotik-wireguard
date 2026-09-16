@@ -560,6 +560,8 @@ async function openAddModal() {
     document.getElementById('modalFormContent').style.display = 'block';
     document.getElementById('modalResultContent').style.display = 'none';
     document.getElementById('modalFooterActions').style.display = 'flex';
+    document.getElementById('addQrTab').disabled = true;
+    clearQrCode('addQrCode');
     document.getElementById('peerName').value = '';
     const submitBtn = document.getElementById('btnSubmitAdd');
     submitBtn.disabled = false;
@@ -569,6 +571,7 @@ async function openAddModal() {
 }
 
 function closeAddModal() {
+    clearQrCode('addQrCode');
     closeModal('addModalBackdrop');
     loadPeers();
 }
@@ -601,6 +604,8 @@ function displayAddResult(peer) {
     document.getElementById('resIp').innerText = peer.ip + '/32';
     document.getElementById('code-conf-text').innerText = peer.config;
     document.getElementById('code-script-text').innerText = peer.script;
+    document.getElementById('addQrTab').disabled = false;
+    renderQrCode('addQrCode', peer.config);
 
     setupDownload(document.getElementById('btnDownloadConf'), `${peer.name}.conf`, peer.config);
     setupDownload(document.getElementById('btnDownloadScript'), `${peer.name}.rsc`, peer.script);
@@ -620,10 +625,49 @@ function switchAddTab(tab) {
     if (tab === 'script') {
         document.getElementById('tab-script').classList.add('active');
         modal.querySelector('[data-tab="script"]')?.classList.add('active');
+    } else if (tab === 'qrcode') {
+        document.getElementById('tab-qrcode').classList.add('active');
+        modal.querySelector('[data-tab="qrcode"]')?.classList.add('active');
     } else {
         document.getElementById('tab-conf').classList.add('active');
         modal.querySelector('[data-tab="conf"]')?.classList.add('active');
     }
+}
+
+function renderQrCode(containerId, configText) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!configText || typeof qrcode !== 'function') {
+        container.textContent = t('js.qrcode_error');
+        container.setAttribute('role', 'alert');
+        return;
+    }
+
+    try {
+        qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+        const code = qrcode(0, 'M');
+        code.addData(configText);
+        code.make();
+        container.innerHTML = code.createSvgTag({
+            cellSize: 5,
+            margin: 20,
+            scalable: true,
+            title: { text: t('js.qrcode_title'), id: `${containerId}-title` },
+            alt: { text: t('js.qrcode_alt'), id: `${containerId}-description` }
+        });
+        container.setAttribute('aria-label', t('js.qrcode_alt'));
+    } catch (error) {
+        container.textContent = t('js.qrcode_error');
+        container.setAttribute('role', 'alert');
+    }
+}
+
+function clearQrCode(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.replaceChildren();
+    container.removeAttribute('aria-label');
+    container.setAttribute('role', 'status');
 }
 
 /* ── Download helper ────────────────────────────────────────── */
@@ -750,6 +794,8 @@ async function openExportModal(id, name, allowedAddress) {
 
     // Hide config tabs, show only IP/port + generate button
     document.getElementById('exportConfigSection').style.display = 'none';
+    document.getElementById('tabBtnExportQr').disabled = true;
+    clearQrCode('exportQrCode');
     document.getElementById('btnRegenerateKey').disabled = false;
     document.getElementById('btnRegenerateKey').innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:16px;height:16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.688-5.57m-1.246-7.755v4.992m0 0h-4.992m4.993 0-3.183-3.183a8.25 8.25 0 0 0-13.688 5.57"/></svg>
@@ -765,6 +811,8 @@ function updateExportConfig(data) {
 
     document.getElementById('code-export-conf-text').innerText = confContent;
     document.getElementById('code-export-script-text').innerText = scriptContent;
+    document.getElementById('tabBtnExportQr').disabled = false;
+    renderQrCode('exportQrCode', confContent);
 
     setupDownload(document.getElementById('btnDownloadExportConf'), `${exportPeerName}.conf`, confContent);
     setupDownload(document.getElementById('btnDownloadExportScript'), `${exportPeerName}.rsc`, scriptContent);
@@ -802,15 +850,19 @@ async function regenerateKey() {
 }
 
 function closeExportModal() {
+    clearQrCode('exportQrCode');
     closeModal('exportModalBackdrop');
 }
 
 function switchExportTab(tab) {
-    ['tabBtnExportConf', 'tabBtnExportScript'].forEach(id => document.getElementById(id).classList.remove('active'));
-    ['tab-export-conf', 'tab-export-script'].forEach(id => document.getElementById(id).classList.remove('active'));
+    ['tabBtnExportConf', 'tabBtnExportScript', 'tabBtnExportQr'].forEach(id => document.getElementById(id).classList.remove('active'));
+    ['tab-export-conf', 'tab-export-script', 'tab-export-qrcode'].forEach(id => document.getElementById(id).classList.remove('active'));
     if (tab === 'script') {
         document.getElementById('tabBtnExportScript').classList.add('active');
         document.getElementById('tab-export-script').classList.add('active');
+    } else if (tab === 'qrcode') {
+        document.getElementById('tabBtnExportQr').classList.add('active');
+        document.getElementById('tab-export-qrcode').classList.add('active');
     } else {
         document.getElementById('tabBtnExportConf').classList.add('active');
         document.getElementById('tab-export-conf').classList.add('active');

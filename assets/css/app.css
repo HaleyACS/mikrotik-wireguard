@@ -850,9 +850,10 @@ tr:hover td {
 /* ── Tabs ───────────────────────────────────────────────────── */
 .tab-buttons {
     display: flex;
+    flex-wrap: wrap;
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 1rem;
-    gap: 1rem;
+    gap: .5rem 1rem;
 }
 
 .tab-btn {
@@ -883,6 +884,47 @@ tr:hover td {
 
 .tab-content.active {
     display: block;
+}
+
+.tab-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.qr-code-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 0;
+    text-align: center;
+}
+
+.qr-code-frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(280px, 100%);
+    min-height: 280px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem;
+    background: #fff;
+    border-radius: 0.5rem;
+}
+
+.qr-code-frame svg {
+    display: block;
+    width: min(280px, 100%);
+    height: auto;
+    max-width: 100%;
+}
+
+.qr-code-panel p {
+    max-width: 28rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
 }
 
 /* ── Code box ───────────────────────────────────────────────── */

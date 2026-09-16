@@ -3,7 +3,7 @@
 A lightweight PHP web dashboard for managing WireGuard peers on a MikroTik RouterOS 7 CHR. Features automatic IP allocation, X25519 key generation, client configuration export, and full i18n support (Italian/English).
 
 ![Dashboard Screenshot](screenshots/Dashboard-2.0.0.png)
-![Export Modal Screenshot](screenshots/Export.png)
+![Export Modal Screenshot](screenshots/Export-2.5-QR.png)
 
 ## Features
 
@@ -11,7 +11,7 @@ A lightweight PHP web dashboard for managing WireGuard peers on a MikroTik Route
 - **Multi-Server** — Switch between MikroTik CHRs via header dropdown; separate configs per server
 - **Auto IP Allocation** — Scans subnet, assigns next free IP
 - **X25519 Key Gen** — `libsodium`-based key pairs with regeneration support
-- **Config Export** — Download `.conf` or `.rsc` per peer
+- **Config Export** — Download `.conf` or `.rsc` per peer, or scan the `.conf` as a QR code in the dashboard. The QR Code tab is available after peer creation or key regeneration.
 - **DNAT Port Display** — Winbox port calculated per peer (`dnat_base + octet3 × multiplier + octet4`)
 - **Live Status** — Auto-refresh (default 30s), handshake/traffic monitoring, interface online/offline badge
 - **Pagination** — Configurable page size (0 to disable)
@@ -78,6 +78,8 @@ The active server is resolved in this order:
 3. First available config file (alphabetically)
 
 `client_export_metadata` controls the RouterOS peer metadata used by `show-client-config` and QR generation. Keep it enabled for RouterOS 7.21+; set it to `false` when connecting to an older CHR. Generated `.conf` and `.rsc` files remain available in either mode.
+
+The dashboard QR code contains the complete WireGuard `.conf` configuration, including the private key. It is generated locally in the browser, is not sent to a third-party service, and is cleared when the modal closes. Scan it from the WireGuard mobile app, or use the `.conf` download for manual import.
 
 ## API Modes
 
